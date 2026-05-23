@@ -163,116 +163,116 @@ export default function App() {
   return (
     <>
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
         @keyframes countPop {
           0% { transform: scale(0.92); opacity: 0.7; }
           70% { transform: scale(1.04); opacity: 1; }
           100% { transform: scale(1); opacity: 1; }
         }
         @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(8px); }
+          from { opacity: 0; transform: translateY(6px); }
           to { opacity: 1; transform: translateY(0); }
         }
+        .upload-btn:hover { background: #e2e8f0 !important; }
+        .upload-btn:active { background: #cbd5e1 !important; }
+        .kml-btn:hover:not(:disabled) { background: #e2e8f0 !important; }
       `}</style>
       <div
         style={{
           minHeight: "100vh",
-          background: "radial-gradient(circle at top, #16213d 0%, #0b1020 45%, #060914 100%)",
+          background: "radial-gradient(ellipse at top, #1a1040 0%, #0d0a1e 50%, #060914 100%)",
           color: "#f8fafc",
           fontFamily: 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-          padding: "40px 20px",
+          padding: "48px 20px 64px",
         }}
       >
-        <div style={{ maxWidth: 880, margin: "0 auto" }}>
+        <div style={{ maxWidth: 860, margin: "0 auto" }}>
+
+          {/* ── Logo bar ─────────────────────────────────────────────────── */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 48 }}>
+            {/* Drop spexi-logo.svg into /public/ to replace this placeholder */}
+            <img
+              src="/spexi-logo.svg"
+              alt="Spexi"
+              style={{ height: 28 }}
+              onError={(e) => { e.target.style.display = "none"; }}
+            />
+            {/* Spexi logo — 6-segment hexagon matching brand mark */}
+            <svg width="30" height="30" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <polygon points="50,50 71,14 29,14" fill="white" stroke="#0d0a1e" strokeWidth="6" strokeLinejoin="round"/>
+              <polygon points="50,50 92,50 71,14" fill="white" stroke="#0d0a1e" strokeWidth="6" strokeLinejoin="round"/>
+              <polygon points="50,50 71,86 92,50" fill="white" stroke="#0d0a1e" strokeWidth="6" strokeLinejoin="round"/>
+              <polygon points="50,50 29,86 71,86" fill="white" stroke="#0d0a1e" strokeWidth="6" strokeLinejoin="round"/>
+              <polygon points="50,50 8,50 29,86" fill="white" stroke="#0d0a1e" strokeWidth="6" strokeLinejoin="round"/>
+              <polygon points="50,50 29,14 8,50" fill="white" stroke="#0d0a1e" strokeWidth="6" strokeLinejoin="round"/>
+            </svg>
+            <span style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.01em", color: "#f8fafc" }}>
+              Spexi
+            </span>
+          </div>
+
+          {/* ── Main card ────────────────────────────────────────────────── */}
           <div
             style={{
-              background: "rgba(15, 23, 42, 0.78)",
-              border: "1px solid rgba(148, 163, 184, 0.18)",
-              borderRadius: 28,
-              padding: 32,
-              boxShadow: "0 24px 80px rgba(0,0,0,0.35)",
-              backdropFilter: "blur(12px)",
+              background: "rgba(15, 10, 30, 0.72)",
+              border: "1px solid rgba(167, 139, 250, 0.14)",
+              borderRadius: 24,
+              padding: "40px 36px",
+              boxShadow: "0 32px 96px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03) inset",
+              backdropFilter: "blur(16px)",
             }}
           >
             {/* Header */}
-            <div style={{ marginBottom: 40, textAlign: "center", paddingTop: 8, paddingBottom: 10 }}>
-              <div
-                style={{
-                  display: "inline-block",
-                  padding: "8px 14px",
-                  borderRadius: 999,
-                  background: "rgba(59, 130, 246, 0.14)",
-                  color: "#93c5fd",
-                  fontSize: 12,
-                  fontWeight: 700,
-                  letterSpacing: "0.08em",
-                  textTransform: "uppercase",
-                  marginBottom: 18,
-                }}
-              >
-                Internal Tool
+            <div style={{ marginBottom: 36 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#a78bfa", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 10 }}>
+                Sales &amp; Ops Tool
               </div>
-              <h1 style={{ margin: 0, fontSize: 56, lineHeight: 0.96, letterSpacing: "-0.04em" }}>
+              <h1 style={{ margin: "0 0 12px", fontSize: 40, fontWeight: 800, lineHeight: 1.1, letterSpacing: "-0.03em", color: "#f8fafc" }}>
                 Mission Count Estimator
               </h1>
-              <p
-                style={{
-                  marginTop: 18,
-                  marginBottom: 0,
-                  color: "#cbd5e1",
-                  fontSize: 18,
-                  lineHeight: 1.6,
-                  maxWidth: 700,
-                  marginLeft: "auto",
-                  marginRight: "auto",
-                }}
-              >
-                Upload an AOI to count intersecting res 9 H3 cells and check flyability.
+              <p style={{ margin: 0, color: "#94a3b8", fontSize: 15, lineHeight: 1.65, maxWidth: 520 }}>
+                Upload an AOI file to assess flyability and generate a credit estimate per polygon.
               </p>
             </div>
 
-            {/* Upload row */}
+            <div style={{ height: 1, background: "rgba(148, 163, 184, 0.08)", marginBottom: 28 }} />
+
+            {/* Upload + Status row */}
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-                gap: 18,
-                marginBottom: 20,
+                gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+                gap: 14,
+                marginBottom: 14,
               }}
             >
+              {/* Upload card */}
               <div
                 style={{
-                  background: "rgba(255,255,255,0.04)",
-                  border: "1px solid rgba(148, 163, 184, 0.16)",
-                  borderRadius: 22,
-                  padding: 20,
+                  background: "rgba(255,255,255,0.03)",
+                  border: "1px solid rgba(148, 163, 184, 0.12)",
+                  borderRadius: 18,
+                  padding: "20px 22px",
                 }}
               >
-                <div
-                  style={{
-                    fontSize: 13,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.08em",
-                    color: "#94a3b8",
-                    marginBottom: 14,
-                    fontWeight: 700,
-                  }}
-                >
-                  Upload your AOI
+                <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#64748b", marginBottom: 14 }}>
+                  AOI File
                 </div>
                 <label
+                  className="upload-btn"
                   style={{
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    gap: 10,
-                    borderRadius: 16,
-                    padding: "14px 20px",
-                    background: "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
+                    gap: 8,
+                    borderRadius: 12,
+                    padding: "13px 20px",
+                    background: "#f8fafc",
                     cursor: "pointer",
                     fontWeight: 700,
-                    fontSize: 15,
-                    color: "#fff",
-                    boxShadow: "0 4px 16px rgba(59,130,246,0.35)",
+                    fontSize: 14,
+                    color: "#0f172a",
+                    transition: "background 150ms",
                     userSelect: "none",
                   }}
                 >
@@ -282,86 +282,72 @@ export default function App() {
                     onChange={handleFile}
                     style={{ display: "none" }}
                   />
-                  {lookupLoading ? "Loading flyability data…" : "↑ Upload AOI file"}
+                  {lookupLoading ? "Loading data…" : "Upload AOI"}
                 </label>
-                <div style={{ marginTop: 8, fontSize: 12, color: "#64748b", textAlign: "center" }}>
-                  .kml, .kmz, .json, .geojson
+                <div style={{ marginTop: 8, fontSize: 11, color: "#475569", textAlign: "center" }}>
+                  .kml · .kmz · .json · .geojson
                 </div>
-                <div
-                  style={{
-                    marginTop: 14,
-                    fontSize: 14,
-                    color: fileName ? "#f8fafc" : "#94a3b8",
-                    wordBreak: "break-word",
-                    background: fileName ? "rgba(59, 130, 246, 0.18)" : "rgba(255,255,255,0.03)",
-                    border: fileName
-                      ? "1px solid rgba(96, 165, 250, 0.35)"
-                      : "1px solid rgba(148, 163, 184, 0.12)",
-                    borderRadius: 14,
-                    padding: "12px 14px",
-                  }}
-                >
-                  {fileName || "No file uploaded yet"}
-                </div>
+                {fileName && (
+                  <div
+                    style={{
+                      marginTop: 14,
+                      fontSize: 13,
+                      color: "#e2e8f0",
+                      wordBreak: "break-word",
+                      background: "rgba(167, 139, 250, 0.1)",
+                      border: "1px solid rgba(167, 139, 250, 0.22)",
+                      borderRadius: 10,
+                      padding: "10px 13px",
+                      animation: "fadeIn 200ms ease-out",
+                    }}
+                  >
+                    {fileName}
+                  </div>
+                )}
               </div>
 
-              {/* Status banner */}
+              {/* Status panel */}
               {statusCfg ? (
                 <div
                   key={status}
                   style={{
                     background: statusCfg.bg,
                     border: `1px solid ${statusCfg.border}`,
-                    borderRadius: 22,
-                    padding: 20,
+                    borderRadius: 18,
+                    padding: "20px 22px",
                     animation: "fadeIn 300ms ease-out",
                     display: "flex",
                     flexDirection: "column",
                     justifyContent: "center",
                   }}
                 >
-                  <div
-                    style={{
-                      fontSize: 13,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.08em",
-                      color: statusCfg.color,
-                      marginBottom: 10,
-                      fontWeight: 700,
-                    }}
-                  >
+                  <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: statusCfg.color, marginBottom: 10, opacity: 0.85 }}>
                     Flyability Status
                   </div>
-                  <div style={{ fontSize: 22, fontWeight: 800, color: statusCfg.color, marginBottom: 8 }}>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: statusCfg.color, marginBottom: 6, letterSpacing: "-0.01em" }}>
                     {statusCfg.label}
                   </div>
-                  <div style={{ color: "#cbd5e1", fontSize: 15, lineHeight: 1.6 }}>
+                  <div style={{ color: "#94a3b8", fontSize: 14, lineHeight: 1.6 }}>
                     {statusCfg.sublabel}
                   </div>
                 </div>
               ) : (
                 <div
                   style={{
-                    background: "rgba(245, 158, 11, 0.10)",
-                    border: "1px solid rgba(245, 158, 11, 0.28)",
-                    borderRadius: 22,
-                    padding: 20,
+                    background: "rgba(255,255,255,0.02)",
+                    border: "1px dashed rgba(148, 163, 184, 0.16)",
+                    borderRadius: 18,
+                    padding: "20px 22px",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "center",
                   }}
                 >
-                  <div
-                    style={{
-                      fontSize: 13,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.08em",
-                      color: "#fbbf24",
-                      marginBottom: 14,
-                      fontWeight: 700,
-                    }}
-                  >
-                    Estimation warning
+                  <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#475569", marginBottom: 10 }}>
+                    Flyability Status
                   </div>
-                  <div style={{ color: "#fde68a", fontSize: 15, lineHeight: 1.7 }}>
-                    Results are estimates based on H3 cell intersections. Always confirm with ops before committing to a customer.
+                  <div style={{ color: "#475569", fontSize: 14, lineHeight: 1.65 }}>
+                    Upload an AOI to see results.
                   </div>
                 </div>
               )}
@@ -371,74 +357,51 @@ export default function App() {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-                gap: 18,
+                gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+                gap: 14,
                 alignItems: "stretch",
+                marginBottom: 0,
               }}
             >
-              <StatCard
-                label="Flyable"
-                count={aggregate?.flyable.length ?? null}
-                color="#22c55e"
-                bg="linear-gradient(135deg, #15803d 0%, #166534 100%)"
-              />
-              <StatCard
-                label="Limited"
-                count={aggregate?.limited.length ?? null}
-                color="#fbbf24"
-                bg="linear-gradient(135deg, #b45309 0%, #92400e 100%)"
-              />
-              <StatCard
-                label="Prohibited"
-                count={aggregate?.prohibited.length ?? null}
-                color="#f87171"
-                bg="linear-gradient(135deg, #b91c1c 0%, #991b1b 100%)"
-              />
+              <StatCard label="Flyable" count={aggregate?.flyable.length ?? null} color="#22c55e" />
+              <StatCard label="Limited" count={aggregate?.limited.length ?? null} color="#f59e0b" />
+              <StatCard label="Prohibited" count={aggregate?.prohibited.length ?? null} color="#f87171" />
 
               {/* Export */}
               <div
                 style={{
-                  background: "rgba(255,255,255,0.04)",
-                  border: "1px solid rgba(148, 163, 184, 0.16)",
-                  borderRadius: 20,
-                  padding: "16px 20px",
+                  background: "rgba(255,255,255,0.03)",
+                  border: "1px solid rgba(148, 163, 184, 0.12)",
+                  borderRadius: 18,
+                  padding: "18px 22px",
                   display: "flex",
                   flexDirection: "column",
                   justifyContent: "space-between",
                 }}
               >
                 <div>
-                  <div
-                    style={{
-                      fontSize: 12,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.08em",
-                      color: "#94a3b8",
-                      marginBottom: 6,
-                      fontWeight: 700,
-                    }}
-                  >
+                  <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#64748b", marginBottom: 6 }}>
                     Export
                   </div>
-                  <div style={{ color: "#cbd5e1", fontSize: 13, lineHeight: 1.5 }}>
-                    KML color-coded by flyability. Open in Google Earth.
+                  <div style={{ color: "#64748b", fontSize: 13, lineHeight: 1.5 }}>
+                    KML color-coded by flyability
                   </div>
                 </div>
                 <button
+                  className="kml-btn"
                   onClick={downloadKML}
                   disabled={!hexes}
                   style={{
-                    marginTop: 12,
-                    padding: "14px 18px",
-                    borderRadius: 16,
+                    marginTop: 14,
+                    padding: "12px 16px",
+                    borderRadius: 12,
                     border: "none",
-                    background: hexes
-                      ? "linear-gradient(135deg, #f8fafc 0%, #cbd5e1 100%)"
-                      : "rgba(148, 163, 184, 0.2)",
-                    color: hexes ? "#0f172a" : "#64748b",
+                    background: hexes ? "#f8fafc" : "rgba(148, 163, 184, 0.1)",
+                    color: hexes ? "#0f172a" : "#334155",
                     fontWeight: 700,
-                    fontSize: 15,
+                    fontSize: 14,
                     cursor: hexes ? "pointer" : "not-allowed",
+                    transition: "background 150ms",
                   }}
                 >
                   Download KML
@@ -446,127 +409,85 @@ export default function App() {
               </div>
             </div>
 
-            {/* ── Credit Estimate ────────────────────────────────────────────── */}
+            {/* ── Credit Estimate ───────────────────────────────────────── */}
             {hexes && (
               <div style={{ animation: "fadeIn 300ms ease-out" }}>
-                <div
-                  style={{
-                    height: 1,
-                    background: "rgba(148, 163, 184, 0.12)",
-                    margin: "28px 0",
-                  }}
-                />
+                <div style={{ height: 1, background: "rgba(148, 163, 184, 0.08)", margin: "28px 0" }} />
 
-                <div style={{ marginBottom: 18 }}>
-                  <div
-                    style={{
-                      fontSize: 13,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.08em",
-                      color: "#94a3b8",
-                      fontWeight: 700,
-                      marginBottom: 4,
-                    }}
-                  >
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#64748b", marginBottom: 4 }}>
                     Credit Estimate
                   </div>
-                  <div style={{ color: "#cbd5e1", fontSize: 14 }}>
-                    Priced per polygon by flyable Spexigon count. 1 credit = $1.
+                  <div style={{ color: "#64748b", fontSize: 13 }}>
+                    Per polygon · flyable Spexigons only · 1 credit = $1
                   </div>
                 </div>
 
                 <div
                   style={{
-                    background: "rgba(255,255,255,0.03)",
-                    border: "1px solid rgba(148, 163, 184, 0.13)",
-                    borderRadius: 18,
+                    background: "rgba(255,255,255,0.02)",
+                    border: "1px solid rgba(148, 163, 184, 0.1)",
+                    borderRadius: 16,
                     overflow: "hidden",
                   }}
                 >
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
                     <thead>
-                      <tr
-                        style={{
-                          background: "rgba(148, 163, 184, 0.07)",
-                          borderBottom: "1px solid rgba(148, 163, 184, 0.13)",
-                        }}
-                      >
+                      <tr style={{ borderBottom: "1px solid rgba(148, 163, 184, 0.1)" }}>
                         <th style={thStyle}>Polygon</th>
-                        <th style={{ ...thStyle, textAlign: "right" }}>Flyable</th>
-                        <th style={{ ...thStyle, textAlign: "right" }}>Limited</th>
-                        <th style={{ ...thStyle, textAlign: "right" }}>Prohibited</th>
+                        <th style={{ ...thStyle, textAlign: "right", color: "#22c55e" }}>Flyable</th>
+                        <th style={{ ...thStyle, textAlign: "right", color: "#f59e0b" }}>Limited</th>
+                        <th style={{ ...thStyle, textAlign: "right", color: "#f87171" }}>Prohibited</th>
                         <th style={{ ...thStyle, textAlign: "right" }}>Credits</th>
-                        <th style={{ ...thStyle, textAlign: "right" }}>$</th>
+                        <th style={{ ...thStyle, textAlign: "right" }}>Price</th>
                       </tr>
                     </thead>
                     <tbody>
                       {creditRows.map((row, i) => (
                         <tr
                           key={i}
-                          style={{ borderTop: i > 0 ? "1px solid rgba(148, 163, 184, 0.08)" : "none" }}
+                          style={{ borderTop: i > 0 ? "1px solid rgba(148, 163, 184, 0.07)" : "none" }}
                         >
                           <td style={tdStyle}>
                             {row.name}
                             {row.hasRestrictions && (
-                              <span style={{ color: "#f59e0b", marginLeft: 4 }}>*</span>
+                              <span style={{ color: "#f59e0b", marginLeft: 5, fontSize: 12 }}>*</span>
                             )}
                           </td>
-                          <td style={{ ...tdStyle, textAlign: "right", color: "#22c55e" }}>
+                          <td style={{ ...tdStyle, textAlign: "right", color: "#22c55e", fontVariantNumeric: "tabular-nums" }}>
                             {row.flyable.toLocaleString()}
                           </td>
-                          <td style={{ ...tdStyle, textAlign: "right", color: row.limited > 0 ? "#f59e0b" : "#475569" }}>
+                          <td style={{ ...tdStyle, textAlign: "right", color: row.limited > 0 ? "#f59e0b" : "#334155", fontVariantNumeric: "tabular-nums" }}>
                             {row.limited.toLocaleString()}
                           </td>
-                          <td style={{ ...tdStyle, textAlign: "right", color: row.prohibited > 0 ? "#f87171" : "#475569" }}>
+                          <td style={{ ...tdStyle, textAlign: "right", color: row.prohibited > 0 ? "#f87171" : "#334155", fontVariantNumeric: "tabular-nums" }}>
                             {row.prohibited.toLocaleString()}
                           </td>
-                          <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700 }}>
+                          <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600, color: "#e2e8f0", fontVariantNumeric: "tabular-nums" }}>
                             {row.price.toLocaleString()}
                           </td>
-                          <td style={{ ...tdStyle, textAlign: "right", color: "#94a3b8" }}>
+                          <td style={{ ...tdStyle, textAlign: "right", color: "#e2e8f0", fontVariantNumeric: "tabular-nums" }}>
                             ${row.price.toLocaleString()}
                           </td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot>
-                      <tr
-                        style={{
-                          borderTop: "1px solid rgba(148, 163, 184, 0.22)",
-                          background: "rgba(148, 163, 184, 0.05)",
-                        }}
-                      >
-                        <td style={{ ...tdStyle, fontWeight: 700, color: "#f8fafc" }}>
-                          Total
-                        </td>
-                        <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700, color: "#22c55e" }}>
+                      <tr style={{ borderTop: "1px solid rgba(148, 163, 184, 0.14)", background: "rgba(167, 139, 250, 0.05)" }}>
+                        <td style={{ ...tdStyle, fontWeight: 700, color: "#f8fafc" }}>Total</td>
+                        <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600, color: "#22c55e", fontVariantNumeric: "tabular-nums" }}>
                           {aggregate.flyable.length.toLocaleString()}
                         </td>
-                        <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700, color: aggregate.limited.length > 0 ? "#f59e0b" : "#475569" }}>
+                        <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600, color: aggregate.limited.length > 0 ? "#f59e0b" : "#334155", fontVariantNumeric: "tabular-nums" }}>
                           {aggregate.limited.length.toLocaleString()}
                         </td>
-                        <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700, color: aggregate.prohibited.length > 0 ? "#f87171" : "#475569" }}>
+                        <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600, color: aggregate.prohibited.length > 0 ? "#f87171" : "#334155", fontVariantNumeric: "tabular-nums" }}>
                           {aggregate.prohibited.length.toLocaleString()}
                         </td>
-                        <td
-                          style={{
-                            ...tdStyle,
-                            textAlign: "right",
-                            fontWeight: 800,
-                            fontSize: 16,
-                            color: "#f8fafc",
-                          }}
-                        >
+                        <td style={{ ...tdStyle, textAlign: "right", fontWeight: 800, fontSize: 16, color: "#f8fafc", fontVariantNumeric: "tabular-nums" }}>
                           {totalCredits.toLocaleString()}
                         </td>
-                        <td
-                          style={{
-                            ...tdStyle,
-                            textAlign: "right",
-                            fontWeight: 700,
-                            color: "#f8fafc",
-                          }}
-                        >
+                        <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700, color: "#f8fafc", fontVariantNumeric: "tabular-nums" }}>
                           ${totalCredits.toLocaleString()}
                         </td>
                       </tr>
@@ -575,15 +496,8 @@ export default function App() {
                 </div>
 
                 {anyRestrictions && (
-                  <div
-                    style={{
-                      marginTop: 12,
-                      fontSize: 13,
-                      color: "#fbbf24",
-                      lineHeight: 1.6,
-                    }}
-                  >
-                    * Price based on flyable zones only. Limited or restricted zones detected — final count subject to ops review.
+                  <div style={{ marginTop: 10, fontSize: 12, color: "#64748b", lineHeight: 1.6 }}>
+                    * Price based on flyable zones only. Limited or restricted zones detected — ops review required before confirming.
                   </div>
                 )}
               </div>
@@ -593,11 +507,12 @@ export default function App() {
               <div
                 style={{
                   marginTop: 20,
-                  padding: 16,
-                  borderRadius: 16,
-                  background: "rgba(127, 29, 29, 0.28)",
-                  border: "1px solid rgba(248, 113, 113, 0.26)",
-                  color: "#fecaca",
+                  padding: "14px 18px",
+                  borderRadius: 14,
+                  background: "rgba(127, 29, 29, 0.22)",
+                  border: "1px solid rgba(248, 113, 113, 0.2)",
+                  color: "#fca5a5",
+                  fontSize: 14,
                 }}
               >
                 <strong>Error:</strong> {error}
@@ -625,14 +540,15 @@ const tdStyle = {
   color: "#cbd5e1",
 };
 
-function StatCard({ label, count, color, bg }) {
+function StatCard({ label, count, color }) {
   return (
     <div
       style={{
-        borderRadius: 20,
-        padding: "16px 20px",
-        background: bg,
-        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.12)",
+        borderRadius: 18,
+        padding: "18px 22px",
+        background: "rgba(255,255,255,0.03)",
+        border: "1px solid rgba(148, 163, 184, 0.12)",
+        borderLeft: `3px solid ${color}`,
         display: "flex",
         flexDirection: "column",
         gap: 4,
@@ -640,10 +556,10 @@ function StatCard({ label, count, color, bg }) {
     >
       <div
         style={{
-          fontSize: 12,
+          fontSize: 11,
           textTransform: "uppercase",
           letterSpacing: "0.08em",
-          color: "rgba(255,255,255,0.70)",
+          color: "#64748b",
           fontWeight: 700,
         }}
       >
@@ -655,13 +571,14 @@ function StatCard({ label, count, color, bg }) {
           fontSize: 36,
           fontWeight: 800,
           lineHeight: 1.1,
-          color: "#fff",
+          color: count !== null && count > 0 ? color : "#f8fafc",
           animation: count !== null ? "countPop 280ms ease-out" : "none",
+          fontVariantNumeric: "tabular-nums",
         }}
       >
         {count !== null ? count.toLocaleString() : "—"}
       </div>
-      <div style={{ color: "rgba(255,255,255,0.55)", fontSize: 12 }}>
+      <div style={{ color: "#334155", fontSize: 11 }}>
         res 9 cells
       </div>
     </div>
