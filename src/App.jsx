@@ -261,12 +261,19 @@ export default function App() {
                 </div>
                 <label
                   style={{
-                    display: "block",
-                    border: "1px dashed rgba(148, 163, 184, 0.36)",
-                    borderRadius: 18,
-                    padding: 22,
-                    background: "rgba(15, 23, 42, 0.55)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 10,
+                    borderRadius: 16,
+                    padding: "14px 20px",
+                    background: "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
                     cursor: "pointer",
+                    fontWeight: 700,
+                    fontSize: 15,
+                    color: "#fff",
+                    boxShadow: "0 4px 16px rgba(59,130,246,0.35)",
+                    userSelect: "none",
                   }}
                 >
                   <input
@@ -275,13 +282,11 @@ export default function App() {
                     onChange={handleFile}
                     style={{ display: "none" }}
                   />
-                  <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>
-                    {lookupLoading ? "Loading flyability data…" : "Upload your AOI"}
-                  </div>
-                  <div style={{ fontSize: 14, color: "#94a3b8", lineHeight: 1.5 }}>
-                    Accepts .kml, .kmz, .json, and .geojson files.
-                  </div>
+                  {lookupLoading ? "Loading flyability data…" : "↑ Upload AOI file"}
                 </label>
+                <div style={{ marginTop: 8, fontSize: 12, color: "#64748b", textAlign: "center" }}>
+                  .kml, .kmz, .json, .geojson
+                </div>
                 <div
                   style={{
                     marginTop: 14,
@@ -395,8 +400,8 @@ export default function App() {
                 style={{
                   background: "rgba(255,255,255,0.04)",
                   border: "1px solid rgba(148, 163, 184, 0.16)",
-                  borderRadius: 24,
-                  padding: 24,
+                  borderRadius: 20,
+                  padding: "16px 20px",
                   display: "flex",
                   flexDirection: "column",
                   justifyContent: "space-between",
@@ -405,30 +410,25 @@ export default function App() {
                 <div>
                   <div
                     style={{
-                      fontSize: 13,
+                      fontSize: 12,
                       textTransform: "uppercase",
                       letterSpacing: "0.08em",
                       color: "#94a3b8",
-                      marginBottom: 12,
+                      marginBottom: 6,
                       fontWeight: 700,
                     }}
                   >
                     Export
                   </div>
-                  <div style={{ color: "#cbd5e1", fontSize: 14, lineHeight: 1.6 }}>
-                    KML with cells color-coded by flyability. Open in Google Earth.
+                  <div style={{ color: "#cbd5e1", fontSize: 13, lineHeight: 1.5 }}>
+                    KML color-coded by flyability. Open in Google Earth.
                   </div>
-                  {hexes && (
-                    <div style={{ marginTop: 10, fontSize: 13, color: "#64748b" }}>
-                      {totalCells.toLocaleString()} total cells
-                    </div>
-                  )}
                 </div>
                 <button
                   onClick={downloadKML}
                   disabled={!hexes}
                   style={{
-                    marginTop: 20,
+                    marginTop: 12,
                     padding: "14px 18px",
                     borderRadius: 16,
                     border: "none",
@@ -629,20 +629,22 @@ function StatCard({ label, count, color, bg }) {
   return (
     <div
       style={{
-        borderRadius: 24,
-        padding: 24,
+        borderRadius: 20,
+        padding: "16px 20px",
         background: bg,
         boxShadow: "inset 0 1px 0 rgba(255,255,255,0.12)",
+        display: "flex",
+        flexDirection: "column",
+        gap: 4,
       }}
     >
       <div
         style={{
-          fontSize: 13,
+          fontSize: 12,
           textTransform: "uppercase",
           letterSpacing: "0.08em",
-          color: "rgba(255,255,255,0.75)",
+          color: "rgba(255,255,255,0.70)",
           fontWeight: 700,
-          marginBottom: 12,
         }}
       >
         {label}
@@ -650,16 +652,16 @@ function StatCard({ label, count, color, bg }) {
       <div
         key={count}
         style={{
-          fontSize: 48,
+          fontSize: 36,
           fontWeight: 800,
-          lineHeight: 1,
+          lineHeight: 1.1,
           color: "#fff",
           animation: count !== null ? "countPop 280ms ease-out" : "none",
         }}
       >
         {count !== null ? count.toLocaleString() : "—"}
       </div>
-      <div style={{ marginTop: 10, color: "rgba(255,255,255,0.65)", fontSize: 13 }}>
+      <div style={{ color: "rgba(255,255,255,0.55)", fontSize: 12 }}>
         res 9 cells
       </div>
     </div>
