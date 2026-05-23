@@ -545,6 +545,18 @@ function StatCard({ label, count, color }) {
 }
 
 function ActionCard({ hasResults, onDownloadKML, onGeneratePDF }) {
+  const buttonStyle = {
+    ...actionButtonStyle,
+    width: "100%",
+    minHeight: 52,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: hasResults ? "#f8fafc" : disabledButtonBg,
+    color: hasResults ? "#0f172a" : "#334155",
+    cursor: hasResults ? "pointer" : "not-allowed",
+  };
+
   return (
     <div
       style={{
@@ -554,23 +566,26 @@ function ActionCard({ hasResults, onDownloadKML, onGeneratePDF }) {
         padding: "18px 22px",
         display: "flex",
         flexDirection: "column",
-        gap: 10,
-        justifyContent: "space-between",
+        gap: 12,
+        justifyContent: "center",
+        alignItems: "stretch",
       }}
     >
       <button
         className="kml-btn"
+        type="button"
         onClick={onDownloadKML}
         disabled={!hasResults}
-        style={{ ...actionButtonStyle, background: hasResults ? "#f8fafc" : disabledButtonBg, color: hasResults ? "#0f172a" : "#334155", cursor: hasResults ? "pointer" : "not-allowed" }}
+        style={buttonStyle}
       >
         Download KML
       </button>
       <button
         className="pdf-btn"
+        type="button"
         onClick={onGeneratePDF}
         disabled={!hasResults}
-        style={{ ...actionButtonStyle, background: hasResults ? "#a78bfa" : disabledButtonBg, color: hasResults ? "#1e123b" : "#334155", cursor: hasResults ? "pointer" : "not-allowed", fontWeight: 800 }}
+        style={buttonStyle}
       >
         Generate PDF Summary
       </button>
