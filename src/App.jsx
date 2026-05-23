@@ -698,19 +698,41 @@ function kmlToGeoJSON(text) {
 function extractPolygonFeatures(geojson) {
   if (!geojson) return [];
   if (geojson.type === "FeatureCollection") {
-    return geojson.features.filter(
-      (f) => f?.geometry?.type === "Polygon" || f?.geometry?.type === "MultiPolygon"
-    );
+    return geojson.features.flatMap((f) => extractFromFeature(f));
   }
-  if (
-    geojson.type === "Feature" &&
-    (geojson.geometry?.type === "Polygon" || geojson.geometry?.type === "MultiPolygon")
-  ) {
-    return [geojson];
+  if (geojson.type === "Feature") {
+    return extractFromFeature(geojson);
   }
   if (geojson.type === "Polygon" || geojson.type === "MultiPolygon") {
     return [{ type: "Feature", properties: {}, geometry: geojson }];
   }
+  return [];
+}
+
+// Handles Polygon, MultiPolygon, and GeometryCollection (e.g. from KML <MultiGeometry>)
+function extractFromFeature(feature) {
+  if (!feature?.geometry) return [];
+  const { geometry, properties } = feature;
+
+  if (geometry.type === "Polygon" || geometry.type === "MultiPolygon") {
+    return [feature];
+  }
+
+  if (geometry.type === "GeometryCollection") {
+    const polygonGeoms = geometry.geometries.filter(
+      (g) => g.type === "Polygon" || g.type === "MultiPolygon"
+    );
+    const baseName = properties?.name || "Polygon";
+    return polygonGeoms.map((g, i) => ({
+      type: "Feature",
+      properties: {
+        ...properties,
+        name: polygonGeoms.length === 1 ? baseName : `${baseName} ${i + 1}`,
+      },
+      geometry: g,
+    }));
+  }
+
   return [];
 }
 
