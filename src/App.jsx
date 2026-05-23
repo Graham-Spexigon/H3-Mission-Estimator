@@ -6,11 +6,24 @@ import toGeoJSON from "@mapbox/togeojson";
 
 const H3_RESOLUTION = 9;
 
-// Overall status derived from counts
-function getStatus(counts) {
-  if (!counts) return null;
-  if (counts.prohibited.length > 0) return "restricted";
-  if (counts.limited.length > 0) return "limited";
+// ── Pricing ──────────────────────────────────────────────────────────────────
+
+function priceForFlyableCount(count) {
+  const n = Math.max(0, Number(count) || 0);
+  if (n === 0) return 0;
+  if (n === 1) return 120;
+  if (n === 2) return 150;
+  if (n === 3) return 165;
+  if (n === 4) return 175;
+  return n * 35;
+}
+
+// ── Status ───────────────────────────────────────────────────────────────────
+
+function getStatus(aggregate) {
+  if (!aggregate) return null;
+  if (aggregate.prohibited.length > 0) return "restricted";
+  if (aggregate.limited.length > 0) return "limited";
   return "flyable";
 }
 
@@ -40,11 +53,12 @@ const STATUS_CONFIG = {
 
 export default function App() {
   const [polygonFeatures, setPolygonFeatures] = useState([]);
-  const [hexes, setHexes] = useState(null); // {flyable, limited, prohibited} arrays
+  // hexes is now an array: [{name, flyable[], limited[], prohibited[]}]
+  const [hexes, setHexes] = useState(null);
   const [fileName, setFileName] = useState("");
   const [error, setError] = useState("");
   const [lookupLoading, setLookupLoading] = useState(false);
-  const lookupRef = useRef(null); // { prohibited: Set, limited: Set }
+  const lookupRef = useRef(null);
 
   async function loadLookup() {
     if (lookupRef.current) return lookupRef.current;
@@ -76,13 +90,18 @@ export default function App() {
         loadLookup(),
       ]);
       setPolygonFeatures(polygons);
-      const allCells = computeHexes(polygons);
-      const categorized = { flyable: [], limited: [], prohibited: [] };
-      for (const cell of allCells) {
-        if (lookup.prohibited.has(cell)) categorized.prohibited.push(cell);
-        else if (lookup.limited.has(cell)) categorized.limited.push(cell);
-        else categorized.flyable.push(cell);
-      }
+
+      // Compute H3 cells per polygon, then classify each
+      const perPolygon = computeHexes(polygons);
+      const categorized = perPolygon.map(({ name, cells }) => {
+        const flyable = [], limited = [], prohibited = [];
+        for (const cell of cells) {
+          if (lookup.prohibited.has(cell)) prohibited.push(cell);
+          else if (lookup.limited.has(cell)) limited.push(cell);
+          else flyable.push(cell);
+        }
+        return { name, flyable, limited, prohibited };
+      });
       setHexes(categorized);
     } catch (err) {
       console.error(err);
@@ -92,13 +111,42 @@ export default function App() {
     }
   }
 
+  // Aggregate all polygons for stat cards, status banner, and KML export
+  const aggregate = hexes
+    ? {
+        flyable: hexes.flatMap((p) => p.flyable),
+        limited: hexes.flatMap((p) => p.limited),
+        prohibited: hexes.flatMap((p) => p.prohibited),
+      }
+    : null;
+
+  const totalCells = aggregate
+    ? aggregate.flyable.length + aggregate.limited.length + aggregate.prohibited.length
+    : 0;
+  const status = aggregate ? getStatus(aggregate) : null;
+  const statusCfg = status ? STATUS_CONFIG[status] : null;
+
+  // Credit rows — one per polygon
+  const creditRows = hexes
+    ? hexes.map((p) => ({
+        name: p.name,
+        flyable: p.flyable.length,
+        limited: p.limited.length,
+        prohibited: p.prohibited.length,
+        hasRestrictions: p.limited.length > 0 || p.prohibited.length > 0,
+        price: priceForFlyableCount(p.flyable.length),
+      }))
+    : [];
+  const totalCredits = creditRows.reduce((sum, r) => sum + r.price, 0);
+  const anyRestrictions = creditRows.some((r) => r.hasRestrictions);
+
   function downloadKML() {
     if (!hexes) return;
-    const allCells = [
-      ...hexes.flyable.map((c) => ({ cell: c, type: "flyable" })),
-      ...hexes.limited.map((c) => ({ cell: c, type: "limited" })),
-      ...hexes.prohibited.map((c) => ({ cell: c, type: "prohibited" })),
-    ];
+    const allCells = hexes.flatMap((p) => [
+      ...p.flyable.map((c) => ({ cell: c, type: "flyable" })),
+      ...p.limited.map((c) => ({ cell: c, type: "limited" })),
+      ...p.prohibited.map((c) => ({ cell: c, type: "prohibited" })),
+    ]);
     if (!allCells.length) return;
 
     const kml = buildKML(allCells);
@@ -107,17 +155,10 @@ export default function App() {
     const a = document.createElement("a");
     a.href = url;
     const base = (fileName || "aoi").replace(/\.[^/.]+$/, "");
-    const total = allCells.length;
-    a.download = `${base}_H3_Res${H3_RESOLUTION}_${total}.kml`;
+    a.download = `${base}_H3_Res${H3_RESOLUTION}_${totalCells}.kml`;
     a.click();
     URL.revokeObjectURL(url);
   }
-
-  const totalCells = hexes
-    ? hexes.flyable.length + hexes.limited.length + hexes.prohibited.length
-    : 0;
-  const status = hexes ? getStatus(hexes) : null;
-  const statusCfg = status ? STATUS_CONFIG[status] : null;
 
   return (
     <>
@@ -259,7 +300,7 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Status banner — shows after upload, otherwise shows warning */}
+              {/* Status banner */}
               {statusCfg ? (
                 <div
                   key={status}
@@ -321,7 +362,7 @@ export default function App() {
               )}
             </div>
 
-            {/* Results row */}
+            {/* Stat cards + export row */}
             <div
               style={{
                 display: "grid",
@@ -330,26 +371,21 @@ export default function App() {
                 alignItems: "stretch",
               }}
             >
-              {/* Flyable */}
               <StatCard
                 label="Flyable"
-                count={hexes?.flyable.length ?? null}
+                count={aggregate?.flyable.length ?? null}
                 color="#22c55e"
                 bg="linear-gradient(135deg, #15803d 0%, #166534 100%)"
               />
-
-              {/* Limited */}
               <StatCard
                 label="Limited"
-                count={hexes?.limited.length ?? null}
+                count={aggregate?.limited.length ?? null}
                 color="#fbbf24"
                 bg="linear-gradient(135deg, #b45309 0%, #92400e 100%)"
               />
-
-              {/* Prohibited */}
               <StatCard
                 label="Prohibited"
-                count={hexes?.prohibited.length ?? null}
+                count={aggregate?.prohibited.length ?? null}
                 color="#f87171"
                 bg="linear-gradient(135deg, #b91c1c 0%, #991b1b 100%)"
               />
@@ -410,6 +446,149 @@ export default function App() {
               </div>
             </div>
 
+            {/* ── Credit Estimate ────────────────────────────────────────────── */}
+            {hexes && (
+              <div style={{ animation: "fadeIn 300ms ease-out" }}>
+                <div
+                  style={{
+                    height: 1,
+                    background: "rgba(148, 163, 184, 0.12)",
+                    margin: "28px 0",
+                  }}
+                />
+
+                <div style={{ marginBottom: 18 }}>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.08em",
+                      color: "#94a3b8",
+                      fontWeight: 700,
+                      marginBottom: 4,
+                    }}
+                  >
+                    Credit Estimate
+                  </div>
+                  <div style={{ color: "#cbd5e1", fontSize: 14 }}>
+                    Priced per polygon by flyable Spexigon count. 1 credit = $1.
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    background: "rgba(255,255,255,0.03)",
+                    border: "1px solid rgba(148, 163, 184, 0.13)",
+                    borderRadius: 18,
+                    overflow: "hidden",
+                  }}
+                >
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                    <thead>
+                      <tr
+                        style={{
+                          background: "rgba(148, 163, 184, 0.07)",
+                          borderBottom: "1px solid rgba(148, 163, 184, 0.13)",
+                        }}
+                      >
+                        <th style={thStyle}>Polygon</th>
+                        <th style={{ ...thStyle, textAlign: "right" }}>Flyable</th>
+                        <th style={{ ...thStyle, textAlign: "right" }}>Limited</th>
+                        <th style={{ ...thStyle, textAlign: "right" }}>Prohibited</th>
+                        <th style={{ ...thStyle, textAlign: "right" }}>Credits</th>
+                        <th style={{ ...thStyle, textAlign: "right" }}>$</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {creditRows.map((row, i) => (
+                        <tr
+                          key={i}
+                          style={{ borderTop: i > 0 ? "1px solid rgba(148, 163, 184, 0.08)" : "none" }}
+                        >
+                          <td style={tdStyle}>
+                            {row.name}
+                            {row.hasRestrictions && (
+                              <span style={{ color: "#f59e0b", marginLeft: 4 }}>*</span>
+                            )}
+                          </td>
+                          <td style={{ ...tdStyle, textAlign: "right", color: "#22c55e" }}>
+                            {row.flyable.toLocaleString()}
+                          </td>
+                          <td style={{ ...tdStyle, textAlign: "right", color: row.limited > 0 ? "#f59e0b" : "#475569" }}>
+                            {row.limited.toLocaleString()}
+                          </td>
+                          <td style={{ ...tdStyle, textAlign: "right", color: row.prohibited > 0 ? "#f87171" : "#475569" }}>
+                            {row.prohibited.toLocaleString()}
+                          </td>
+                          <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700 }}>
+                            {row.price.toLocaleString()}
+                          </td>
+                          <td style={{ ...tdStyle, textAlign: "right", color: "#94a3b8" }}>
+                            ${row.price.toLocaleString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr
+                        style={{
+                          borderTop: "1px solid rgba(148, 163, 184, 0.22)",
+                          background: "rgba(148, 163, 184, 0.05)",
+                        }}
+                      >
+                        <td style={{ ...tdStyle, fontWeight: 700, color: "#f8fafc" }}>
+                          Total
+                        </td>
+                        <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700, color: "#22c55e" }}>
+                          {aggregate.flyable.length.toLocaleString()}
+                        </td>
+                        <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700, color: aggregate.limited.length > 0 ? "#f59e0b" : "#475569" }}>
+                          {aggregate.limited.length.toLocaleString()}
+                        </td>
+                        <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700, color: aggregate.prohibited.length > 0 ? "#f87171" : "#475569" }}>
+                          {aggregate.prohibited.length.toLocaleString()}
+                        </td>
+                        <td
+                          style={{
+                            ...tdStyle,
+                            textAlign: "right",
+                            fontWeight: 800,
+                            fontSize: 16,
+                            color: "#f8fafc",
+                          }}
+                        >
+                          {totalCredits.toLocaleString()}
+                        </td>
+                        <td
+                          style={{
+                            ...tdStyle,
+                            textAlign: "right",
+                            fontWeight: 700,
+                            color: "#f8fafc",
+                          }}
+                        >
+                          ${totalCredits.toLocaleString()}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+
+                {anyRestrictions && (
+                  <div
+                    style={{
+                      marginTop: 12,
+                      fontSize: 13,
+                      color: "#fbbf24",
+                      lineHeight: 1.6,
+                    }}
+                  >
+                    * Price based on flyable zones only. Limited or restricted zones detected — final count subject to ops review.
+                  </div>
+                )}
+              </div>
+            )}
+
             {error && (
               <div
                 style={{
@@ -430,6 +609,21 @@ export default function App() {
     </>
   );
 }
+
+const thStyle = {
+  padding: "12px 16px",
+  textAlign: "left",
+  fontSize: 12,
+  fontWeight: 700,
+  textTransform: "uppercase",
+  letterSpacing: "0.07em",
+  color: "#64748b",
+};
+
+const tdStyle = {
+  padding: "12px 16px",
+  color: "#cbd5e1",
+};
 
 function StatCard({ label, count, color, bg }) {
   return (
@@ -472,7 +666,7 @@ function StatCard({ label, count, color, bg }) {
   );
 }
 
-// ── File parsing (unchanged) ────────────────────────────────────────────────
+// ── File parsing ─────────────────────────────────────────────────────────────
 
 async function parseFile(file) {
   const name = file.name.toLowerCase();
@@ -520,24 +714,32 @@ function extractPolygonFeatures(geojson) {
   return [];
 }
 
-// ── H3 computation (unchanged) ──────────────────────────────────────────────
+// ── H3 computation ───────────────────────────────────────────────────────────
 
+// Returns [{name, cells[]}] — one entry per polygon
 function computeHexes(polygons) {
-  const fc = turf.featureCollection(polygons);
-  const bbox = turf.bbox(fc);
+  return polygons.map((polygon, i) => ({
+    name: polygon.properties?.name || `Polygon ${i + 1}`,
+    cells: computeHexesForPolygon(polygon),
+  }));
+}
+
+// Compute intersecting H3 cells for a single polygon feature
+function computeHexesForPolygon(polygon) {
+  const bbox = turf.bbox(polygon);
   const [minX, minY, maxX, maxY] = bbox;
-  const stepX = (maxX - minX) / 4;
-  const stepY = (maxY - minY) / 4;
+  const stepX = (maxX - minX) / 4 || 0.01;
+  const stepY = (maxY - minY) / 4 || 0.01;
+
   const seedPoints = [];
   for (let ix = 0; ix <= 4; ix++) {
     for (let iy = 0; iy <= 4; iy++) {
       seedPoints.push([minY + stepY * iy, minX + stepX * ix]);
     }
   }
-  for (const poly of polygons) {
-    const pt = turf.pointOnFeature(poly);
-    seedPoints.push([pt.geometry.coordinates[1], pt.geometry.coordinates[0]]);
-  }
+  const pt = turf.pointOnFeature(polygon);
+  seedPoints.push([pt.geometry.coordinates[1], pt.geometry.coordinates[0]]);
+
   const candidateCells = new Set();
   for (const [lat, lng] of seedPoints) {
     try {
@@ -547,18 +749,16 @@ function computeHexes(polygons) {
       console.error("Seed point failed", err);
     }
   }
+
   const selected = [];
   for (const cell of Array.from(candidateCells).sort()) {
     const hexFeature = h3ToPolygonFeature(cell);
     let intersects = false;
-    for (const poly of polygons) {
-      let inter = null;
-      try {
-        inter = turf.intersect(turf.featureCollection([hexFeature, poly]));
-      } catch {
-        inter = null;
-      }
-      if (inter) { intersects = true; break; }
+    try {
+      const inter = turf.intersect(turf.featureCollection([hexFeature, polygon]));
+      if (inter) intersects = true;
+    } catch {
+      intersects = false;
     }
     if (intersects) selected.push(cell);
   }
@@ -572,22 +772,23 @@ function h3ToPolygonFeature(cell) {
   return turf.polygon([coords]);
 }
 
-// ── KML export (color-coded) ────────────────────────────────────────────────
+// ── KML export ───────────────────────────────────────────────────────────────
 
-// KML colors: aabbggrr
 const KML_COLORS = {
-  flyable:    { line: "ff00cc44", poly: "4400cc44" }, // green
-  limited:    { line: "ff00aaff", poly: "4400aaff" }, // amber
-  prohibited: { line: "ff0000ff", poly: "440000ff" }, // red
+  flyable:    { line: "ff00cc44", poly: "4400cc44" },
+  limited:    { line: "ff00aaff", poly: "4400aaff" },
+  prohibited: { line: "ff0000ff", poly: "440000ff" },
 };
 
 function buildKML(cells) {
   const styles = Object.entries(KML_COLORS)
-    .map(([type, { line, poly }]) => `
+    .map(
+      ([type, { line, poly }]) => `
     <Style id="${type}">
       <LineStyle><color>${line}</color><width>1.5</width></LineStyle>
       <PolyStyle><color>${poly}</color></PolyStyle>
-    </Style>`)
+    </Style>`
+    )
     .join("");
 
   const placemarks = cells
