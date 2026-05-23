@@ -9,8 +9,8 @@ const H3_RESOLUTION = 9;
 // Overall status derived from counts
 function getStatus(counts) {
   if (!counts) return null;
-  if (counts.prohibited > 0) return "restricted";
-  if (counts.limited > 0) return "limited";
+  if (counts.prohibited.length > 0) return "restricted";
+  if (counts.limited.length > 0) return "limited";
   return "flyable";
 }
 
