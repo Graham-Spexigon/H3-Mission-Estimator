@@ -230,7 +230,7 @@ export default function App() {
               <h1 style={{ margin: "0 0 12px", fontSize: 40, fontWeight: 800, lineHeight: 1.1, letterSpacing: "-0.03em", color: "#f8fafc" }}>
                 Mission Count Estimator
               </h1>
-              <p style={{ margin: 0, color: "#94a3b8", fontSize: 15, lineHeight: 1.65, maxWidth: 520 }}>
+              <p style={{ margin: 0, color: "#94a3b8", fontSize: 15, lineHeight: 1.65, textAlign: "center" }}>
                 Upload an AOI file to assess flyability and generate a credit estimate per polygon.
               </p>
             </div>
@@ -292,16 +292,12 @@ export default function App() {
                     style={{
                       marginTop: 14,
                       fontSize: 13,
-                      color: "#e2e8f0",
+                      color: "#94a3b8",
                       wordBreak: "break-word",
-                      background: "rgba(167, 139, 250, 0.1)",
-                      border: "1px solid rgba(167, 139, 250, 0.22)",
-                      borderRadius: 10,
-                      padding: "10px 13px",
                       animation: "fadeIn 200ms ease-out",
                     }}
                   >
-                    {fileName}
+                    <span style={{ color: "#64748b" }}>File: </span>{fileName}
                   </div>
                 )}
               </div>
@@ -379,14 +375,6 @@ export default function App() {
                   justifyContent: "space-between",
                 }}
               >
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#64748b", marginBottom: 6 }}>
-                    Export
-                  </div>
-                  <div style={{ color: "#64748b", fontSize: 13, lineHeight: 1.5 }}>
-                    KML color-coded by flyability
-                  </div>
-                </div>
                 <button
                   className="kml-btn"
                   onClick={downloadKML}
