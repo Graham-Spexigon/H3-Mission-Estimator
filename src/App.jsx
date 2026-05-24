@@ -204,30 +204,31 @@ export default function App() {
   const statusCfg = status ? STATUS_CONFIG[status] : null;
 
   // Credit rows — grouped by contiguity (polygons within 1 H3 res-9 cell are pooled)
+  // Price treats all cells (flyable + limited + prohibited) as flyable — restrictions are flagged, not excluded
   const creditRows = hexes
     ? groupContiguousPolygons(hexes).map((indices) => {
         const polys = indices.map((i) => hexes[i]);
         const flyable    = polys.reduce((s, p) => s + p.flyable.length, 0);
         const limited    = polys.reduce((s, p) => s + p.limited.length, 0);
         const prohibited = polys.reduce((s, p) => s + p.prohibited.length, 0);
-        const flyablePrice    = priceForFlyableCount(flyable);
-        const limitedPrice    = priceForFlyableCount(limited);
-        const prohibitedPrice = priceForFlyableCount(prohibited);
-        const price           = flyablePrice + limitedPrice + prohibitedPrice;
-        const hasRestrictions = polys.some((p) => p.limited.length > 0 || p.prohibited.length > 0);
+        const price      = priceForFlyableCount(flyable + limited + prohibited);
+        const hasRestrictions = limited > 0 || prohibited > 0;
+        // Row colour follows the most restrictive zone present
+        const rowColor   = prohibited > 0 ? "#f87171" : limited > 0 ? "#f59e0b" : "#22c55e";
         const name = polys.length === 1
           ? polys[0].name
           : polys.map((p) => p.name).join(" + ");
-        // Flatten all zones across polygons in this group for zone detail expansion
         const limitedZones    = polys.flatMap((p) => p.limited);
         const prohibitedZones = polys.flatMap((p) => p.prohibited);
-        return { name, flyable, limited, prohibited, flyablePrice, limitedPrice, prohibitedPrice, price, hasRestrictions, isGroup: polys.length > 1, limitedZones, prohibitedZones };
+        return { name, flyable, limited, prohibited, price, rowColor, hasRestrictions, isGroup: polys.length > 1, limitedZones, prohibitedZones };
       })
     : [];
-  const totalCredits          = creditRows.reduce((sum, r) => sum + r.price, 0);
-  const totalFlyableCredits   = creditRows.reduce((sum, r) => sum + r.flyablePrice, 0);
-  const totalRestrictedCredits = creditRows.reduce((sum, r) => sum + r.limitedPrice + r.prohibitedPrice, 0);
-  const anyRestrictions = creditRows.some((r) => r.hasRestrictions);
+  const totalCredits       = creditRows.reduce((sum, r) => sum + r.price, 0);
+  const flyableOnlyTotal   = creditRows.filter(r => !r.hasRestrictions).reduce((sum, r) => sum + r.price, 0);
+  const restrictedTotal    = creditRows.filter(r =>  r.hasRestrictions).reduce((sum, r) => sum + r.price, 0);
+  const restrictedHasProhibited = creditRows.some(r => r.hasRestrictions && r.prohibited > 0);
+  const anyRestrictions    = creditRows.some(r => r.hasRestrictions);
+  const anyFlyableOnly     = creditRows.some(r => !r.hasRestrictions);
 
   function downloadKML() {
     if (!hexes) return;
@@ -515,8 +516,7 @@ export default function App() {
                         <th style={{ ...thStyle, textAlign: "right", color: "#22c55e" }}>Flyable</th>
                         <th style={{ ...thStyle, textAlign: "right", color: "#f59e0b" }}>Limited</th>
                         <th style={{ ...thStyle, textAlign: "right", color: "#f87171" }}>Prohibited</th>
-                        <th style={{ ...thStyle, textAlign: "right" }}>Credits</th>
-                        <th style={{ ...thStyle, textAlign: "right" }}>Total</th>
+                        <th style={{ ...thStyle, textAlign: "right" }}>Price</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -568,9 +568,6 @@ export default function App() {
                                     }}>Group</span>
                                   )}
                                 </span>
-                                {row.hasRestrictions && (
-                                  <span style={{ color: "#f59e0b", fontSize: 12 }}>*</span>
-                                )}
                               </td>
                               <td style={{ ...tdStyle, textAlign: "right", color: "#22c55e", fontVariantNumeric: "tabular-nums" }}>
                                 {row.flyable.toLocaleString()}
@@ -581,26 +578,15 @@ export default function App() {
                               <td style={{ ...tdStyle, textAlign: "right", color: row.prohibited > 0 ? "#f87171" : "#334155", fontVariantNumeric: "tabular-nums" }}>
                                 {row.prohibited.toLocaleString()}
                               </td>
-                              {/* Credits — stacked by zone type */}
-                              <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums", lineHeight: 1.6 }}>
-                                <div style={{ color: "#22c55e", fontWeight: 600 }}>{row.flyablePrice.toLocaleString()}</div>
-                                {row.limitedPrice > 0 && (
-                                  <div style={{ color: "#f59e0b", fontSize: 12 }}>{row.limitedPrice.toLocaleString()}*</div>
-                                )}
-                                {row.prohibitedPrice > 0 && (
-                                  <div style={{ color: "#f87171", fontSize: 12 }}>{row.prohibitedPrice.toLocaleString()}*</div>
-                                )}
-                              </td>
-                              {/* Total */}
-                              <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600, color: "#e2e8f0", fontVariantNumeric: "tabular-nums" }}>
-                                ${row.price.toLocaleString()}
+                              <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600, color: row.rowColor, fontVariantNumeric: "tabular-nums" }}>
+                                ${row.price.toLocaleString()}{row.hasRestrictions && <span style={{ fontSize: 11, marginLeft: 1 }}>*</span>}
                               </td>
                             </tr>
 
                             {/* Expanded zone detail rows */}
                             {isExpanded && (
                               <tr key={`expand-${i}`} style={{ background: "rgba(0,0,0,0.18)" }}>
-                                <td colSpan={6} style={{ padding: "0 0 8px 46px" }}>
+                                <td colSpan={5} style={{ padding: "0 0 8px 46px" }}>
                                   {[
                                     ...row.prohibitedZones.map((z) => ({ ...z, type: "prohibited" })),
                                     ...row.limitedZones.map((z) => ({ ...z, type: "limited" })),
@@ -639,6 +625,29 @@ export default function App() {
                       })}
                     </tbody>
                     <tfoot>
+                      {/* Flyable-only subtotal — only shown when there are also restricted rows */}
+                      {anyRestrictions && anyFlyableOnly && (
+                        <tr style={{ borderTop: "1px solid rgba(148, 163, 184, 0.1)" }}>
+                          <td colSpan={4} style={{ ...tdStyle, fontWeight: 600, color: "#22c55e", fontSize: 13 }}>
+                            Flyable subtotal
+                          </td>
+                          <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600, color: "#22c55e", fontVariantNumeric: "tabular-nums" }}>
+                            ${flyableOnlyTotal.toLocaleString()}
+                          </td>
+                        </tr>
+                      )}
+                      {/* Restricted subtotal — amber if limited only, red if any prohibited */}
+                      {anyRestrictions && (
+                        <tr style={{ borderTop: "1px solid rgba(148, 163, 184, 0.1)" }}>
+                          <td colSpan={4} style={{ ...tdStyle, fontWeight: 600, color: restrictedHasProhibited ? "#f87171" : "#f59e0b", fontSize: 13 }}>
+                            Restricted subtotal*
+                          </td>
+                          <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600, color: restrictedHasProhibited ? "#f87171" : "#f59e0b", fontVariantNumeric: "tabular-nums" }}>
+                            ${restrictedTotal.toLocaleString()}*
+                          </td>
+                        </tr>
+                      )}
+                      {/* Grand total */}
                       <tr style={{ borderTop: "1px solid rgba(148, 163, 184, 0.14)", background: "rgba(167, 139, 250, 0.05)" }}>
                         <td style={{ ...tdStyle, fontWeight: 700, color: "#f8fafc" }}>Total</td>
                         <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600, color: "#22c55e", fontVariantNumeric: "tabular-nums" }}>
@@ -650,27 +659,8 @@ export default function App() {
                         <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600, color: aggregate.prohibitedCount > 0 ? "#f87171" : "#334155", fontVariantNumeric: "tabular-nums" }}>
                           {aggregate.prohibitedCount.toLocaleString()}
                         </td>
-                        {/* Credits subtotals: flyable (green), restricted (red*) */}
-                        <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums", lineHeight: 1.8 }}>
-                          <div style={{ color: "#22c55e", fontWeight: 700, fontSize: 15 }}>
-                            {totalFlyableCredits.toLocaleString()}
-                          </div>
-                          {totalRestrictedCredits > 0 && (
-                            <div style={{ color: "#f87171", fontWeight: 600, fontSize: 13 }}>
-                              {totalRestrictedCredits.toLocaleString()}*
-                            </div>
-                          )}
-                        </td>
-                        {/* Grand total */}
-                        <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                          <div style={{ fontWeight: 800, fontSize: 16, color: "#f8fafc" }}>
-                            ${totalCredits.toLocaleString()}
-                          </div>
-                          {totalRestrictedCredits > 0 && (
-                            <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>
-                              ${totalFlyableCredits.toLocaleString()} flyable
-                            </div>
-                          )}
+                        <td style={{ ...tdStyle, textAlign: "right", fontWeight: 800, fontSize: 16, color: "#f8fafc", fontVariantNumeric: "tabular-nums" }}>
+                          ${totalCredits.toLocaleString()}
                         </td>
                       </tr>
                     </tfoot>
