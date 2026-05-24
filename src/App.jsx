@@ -5,6 +5,13 @@ import { latLngToCell, cellToBoundary, gridDisk } from "h3-js";
 import toGeoJSON from "@mapbox/togeojson";
 
 const H3_RESOLUTION = 9;
+const H3_RES9_KM2   = 0.1052; // approx area of one H3 res-9 cell in km²
+
+function cellsToKm2(n) {
+  if (!n) return "0";
+  const v = n * H3_RES9_KM2;
+  return v < 1 ? v.toFixed(2) : v.toFixed(1);
+}
 
 // ── Pricing ──────────────────────────────────────────────────────────────────
 
@@ -109,6 +116,7 @@ export default function App() {
   const [error, setError] = useState("");
   const [lookupLoading, setLookupLoading] = useState(false);
   const [expandedRows, setExpandedRows] = useState(new Set());
+  const [isDragging, setIsDragging] = useState(false);
   const lookupRef = useRef(null);
 
   function toggleRow(i) {
@@ -145,12 +153,12 @@ export default function App() {
     }
   }
 
-  async function handleFile(e) {
-    const file = e.target.files?.[0];
+  async function processFile(file) {
     if (!file) return;
     setError("");
     setFileName(file.name);
     setHexes(null);
+    setExpandedRows(new Set());
 
     try {
       const [polygons, lookup] = await Promise.all([
@@ -182,6 +190,17 @@ export default function App() {
       setHexes(null);
       setError(err.message || "Could not process file.");
     }
+  }
+
+  function handleFile(e) { processFile(e.target.files?.[0]); }
+
+  function handleDragOver(e) { e.preventDefault(); setIsDragging(true); }
+  function handleDragLeave(e) { if (!e.currentTarget.contains(e.relatedTarget)) setIsDragging(false); }
+  function handleDrop(e) {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) processFile(file);
   }
 
   // Aggregate all polygons for stat cards, status banner, and KML export
@@ -336,13 +355,19 @@ export default function App() {
                 marginBottom: 14,
               }}
             >
-              {/* Upload card */}
+              {/* Upload card — also a drop zone */}
               <div
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
                 style={{
-                  background: "rgba(255,255,255,0.03)",
-                  border: "1px solid rgba(148, 163, 184, 0.12)",
+                  background: isDragging ? "rgba(167,139,250,0.08)" : "rgba(255,255,255,0.03)",
+                  border: isDragging
+                    ? "1.5px dashed rgba(167,139,250,0.6)"
+                    : "1px solid rgba(148, 163, 184, 0.12)",
                   borderRadius: 18,
                   padding: "20px 22px",
+                  transition: "background 150ms, border 150ms",
                 }}
               >
                 <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#64748b", marginBottom: 14 }}>
@@ -374,8 +399,8 @@ export default function App() {
                   />
                   {lookupLoading ? "Loading data…" : "Upload AOI"}
                 </label>
-                <div style={{ marginTop: 8, fontSize: 11, color: "#475569", textAlign: "center" }}>
-                  .kml · .kmz · .json · .geojson
+                <div style={{ marginTop: 8, fontSize: 11, color: isDragging ? "#a78bfa" : "#475569", textAlign: "center", transition: "color 150ms" }}>
+                  {isDragging ? "Drop to load" : "or drag & drop · .kml · .kmz · .json · .geojson"}
                 </div>
                 {fileName && (
                   <div
@@ -513,9 +538,9 @@ export default function App() {
                     <thead>
                       <tr style={{ borderBottom: "1px solid rgba(148, 163, 184, 0.1)" }}>
                         <th style={thStyle}>Polygon</th>
-                        <th style={{ ...thStyle, textAlign: "right", color: "#22c55e" }}>Flyable</th>
-                        <th style={{ ...thStyle, textAlign: "right", color: "#f59e0b" }}>Limited</th>
-                        <th style={{ ...thStyle, textAlign: "right", color: "#f87171" }}>Prohibited</th>
+                        <th style={{ ...thStyle, textAlign: "right", color: "#22c55e" }}>Flyable<div style={{ fontWeight: 400, fontSize: 10, color: "#334155", textTransform: "none", letterSpacing: 0 }}>km²</div></th>
+                        <th style={{ ...thStyle, textAlign: "right", color: "#f59e0b" }}>Limited<div style={{ fontWeight: 400, fontSize: 10, color: "#334155", textTransform: "none", letterSpacing: 0 }}>km²</div></th>
+                        <th style={{ ...thStyle, textAlign: "right", color: "#f87171" }}>Prohibited<div style={{ fontWeight: 400, fontSize: 10, color: "#334155", textTransform: "none", letterSpacing: 0 }}>km²</div></th>
                         <th style={{ ...thStyle, textAlign: "right" }}>Price</th>
                       </tr>
                     </thead>
@@ -533,50 +558,78 @@ export default function App() {
                                 cursor: canExpand ? "pointer" : "default",
                               }}
                             >
-                              <td style={{ ...tdStyle, display: "flex", alignItems: "center", gap: 8 }}>
-                                {canExpand ? (
-                                  <span style={{
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    width: 18,
-                                    height: 18,
-                                    color: "#a78bfa",
-                                    fontSize: 11,
-                                    transition: "transform 180ms",
-                                    transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)",
-                                    flexShrink: 0,
-                                  }}>▶</span>
-                                ) : (
-                                  <span style={{ width: 18, flexShrink: 0 }} />
-                                )}
-                                <span>
-                                  {row.name}
-                                  {row.isGroup && (
-                                    <span style={{
-                                      marginLeft: 8,
-                                      fontSize: 10,
-                                      fontWeight: 700,
-                                      color: "#a78bfa",
-                                      background: "rgba(167,139,250,0.12)",
-                                      border: "1px solid rgba(167,139,250,0.25)",
-                                      borderRadius: 4,
-                                      padding: "1px 5px",
-                                      letterSpacing: "0.05em",
-                                      textTransform: "uppercase",
-                                      verticalAlign: "middle",
-                                    }}>Group</span>
-                                  )}
-                                </span>
+                              <td style={{ ...tdStyle }}>
+                                {(() => {
+                                  // Build unique restriction chips (prohibited first, then limited)
+                                  const prohibChips = [...new Set(row.prohibitedZones.map(z => z.desc))];
+                                  const limitChips  = [...new Set(row.limitedZones.map(z => z.desc))];
+                                  const allChips = [
+                                    ...prohibChips.map(d => ({ d, color: "#f87171", bg: "rgba(248,113,113,0.1)", border: "rgba(248,113,113,0.25)" })),
+                                    ...limitChips.map(d =>  ({ d, color: "#f59e0b", bg: "rgba(245,158,11,0.1)",  border: "rgba(245,158,11,0.25)" })),
+                                  ];
+                                  const visibleChips = allChips.slice(0, 3);
+                                  const extraCount   = allChips.length - visibleChips.length;
+                                  return (
+                                    <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                                      {/* expand arrow */}
+                                      {canExpand ? (
+                                        <span style={{
+                                          display: "inline-flex", alignItems: "center", justifyContent: "center",
+                                          width: 18, height: 18, marginTop: 1,
+                                          color: "#a78bfa", fontSize: 11,
+                                          transition: "transform 180ms",
+                                          transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)",
+                                          flexShrink: 0,
+                                        }}>▶</span>
+                                      ) : (
+                                        <span style={{ width: 18, flexShrink: 0 }} />
+                                      )}
+                                      <div>
+                                        {/* Polygon name + group badge */}
+                                        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                                          <span>{row.name}</span>
+                                          {row.isGroup && (
+                                            <span style={{
+                                              fontSize: 10, fontWeight: 700, color: "#a78bfa",
+                                              background: "rgba(167,139,250,0.12)", border: "1px solid rgba(167,139,250,0.25)",
+                                              borderRadius: 4, padding: "1px 5px",
+                                              letterSpacing: "0.05em", textTransform: "uppercase",
+                                            }}>Group</span>
+                                          )}
+                                        </div>
+                                        {/* Restriction chips */}
+                                        {visibleChips.length > 0 && (
+                                          <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 5 }}>
+                                            {visibleChips.map((chip, ci) => (
+                                              <span key={ci} style={{
+                                                fontSize: 11, fontWeight: 500,
+                                                color: chip.color, background: chip.bg,
+                                                border: `1px solid ${chip.border}`,
+                                                borderRadius: 4, padding: "1px 6px",
+                                                whiteSpace: "nowrap",
+                                              }}>{chip.d}</span>
+                                            ))}
+                                            {extraCount > 0 && (
+                                              <span style={{ fontSize: 11, color: "#64748b", padding: "1px 4px" }}>+{extraCount} more</span>
+                                            )}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })()}
                               </td>
-                              <td style={{ ...tdStyle, textAlign: "right", color: "#22c55e", fontVariantNumeric: "tabular-nums" }}>
+                              <td style={{ ...tdStyle, textAlign: "right", color: "#22c55e", fontVariantNumeric: "tabular-nums", lineHeight: 1.3 }}>
                                 {row.flyable.toLocaleString()}
+                                <div style={{ fontSize: 11, color: "#334155" }}>~{cellsToKm2(row.flyable)}</div>
                               </td>
-                              <td style={{ ...tdStyle, textAlign: "right", color: row.limited > 0 ? "#f59e0b" : "#334155", fontVariantNumeric: "tabular-nums" }}>
-                                {row.limited.toLocaleString()}
+                              <td style={{ ...tdStyle, textAlign: "right", color: row.limited > 0 ? "#f59e0b" : "#334155", fontVariantNumeric: "tabular-nums", lineHeight: 1.3 }}>
+                                {row.limited > 0 ? row.limited.toLocaleString() : <span style={{ color: "#1e293b" }}>—</span>}
+                                {row.limited > 0 && <div style={{ fontSize: 11, color: "#334155" }}>~{cellsToKm2(row.limited)}</div>}
                               </td>
-                              <td style={{ ...tdStyle, textAlign: "right", color: row.prohibited > 0 ? "#f87171" : "#334155", fontVariantNumeric: "tabular-nums" }}>
-                                {row.prohibited.toLocaleString()}
+                              <td style={{ ...tdStyle, textAlign: "right", color: row.prohibited > 0 ? "#f87171" : "#334155", fontVariantNumeric: "tabular-nums", lineHeight: 1.3 }}>
+                                {row.prohibited > 0 ? row.prohibited.toLocaleString() : <span style={{ color: "#1e293b" }}>—</span>}
+                                {row.prohibited > 0 && <div style={{ fontSize: 11, color: "#334155" }}>~{cellsToKm2(row.prohibited)}</div>}
                               </td>
                               <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600, color: row.rowColor, fontVariantNumeric: "tabular-nums" }}>
                                 ${row.price.toLocaleString()}{row.hasRestrictions && <span style={{ fontSize: 11, marginLeft: 1 }}>*</span>}
@@ -625,9 +678,13 @@ export default function App() {
                       })}
                     </tbody>
                     <tfoot>
+                      {/* Heavy separator between data rows and subtotals */}
+                      <tr>
+                        <td colSpan={5} style={{ padding: 0, borderTop: "2px solid rgba(148, 163, 184, 0.3)", height: 0 }} />
+                      </tr>
                       {/* Flyable-only subtotal — only shown when there are also restricted rows */}
                       {anyRestrictions && anyFlyableOnly && (
-                        <tr style={{ borderTop: "1px solid rgba(148, 163, 184, 0.1)" }}>
+                        <tr>
                           <td colSpan={4} style={{ ...tdStyle, fontWeight: 600, color: "#22c55e", fontSize: 13 }}>
                             Flyable subtotal
                           </td>
@@ -638,7 +695,7 @@ export default function App() {
                       )}
                       {/* Restricted subtotal — amber if limited only, red if any prohibited */}
                       {anyRestrictions && (
-                        <tr style={{ borderTop: "1px solid rgba(148, 163, 184, 0.1)" }}>
+                        <tr>
                           <td colSpan={4} style={{ ...tdStyle, fontWeight: 600, color: restrictedHasProhibited ? "#f87171" : "#f59e0b", fontSize: 13 }}>
                             Restricted subtotal*
                           </td>
@@ -650,14 +707,17 @@ export default function App() {
                       {/* Grand total */}
                       <tr style={{ borderTop: "1px solid rgba(148, 163, 184, 0.14)", background: "rgba(167, 139, 250, 0.05)" }}>
                         <td style={{ ...tdStyle, fontWeight: 700, color: "#f8fafc" }}>Total</td>
-                        <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600, color: "#22c55e", fontVariantNumeric: "tabular-nums" }}>
+                        <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600, color: "#22c55e", fontVariantNumeric: "tabular-nums", lineHeight: 1.3 }}>
                           {aggregate.flyableCount.toLocaleString()}
+                          <div style={{ fontSize: 11, color: "#334155", fontWeight: 400 }}>~{cellsToKm2(aggregate.flyableCount)}</div>
                         </td>
-                        <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600, color: aggregate.limitedCount > 0 ? "#f59e0b" : "#334155", fontVariantNumeric: "tabular-nums" }}>
-                          {aggregate.limitedCount.toLocaleString()}
+                        <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600, color: aggregate.limitedCount > 0 ? "#f59e0b" : "#334155", fontVariantNumeric: "tabular-nums", lineHeight: 1.3 }}>
+                          {aggregate.limitedCount > 0 ? aggregate.limitedCount.toLocaleString() : <span style={{ color: "#1e293b" }}>—</span>}
+                          {aggregate.limitedCount > 0 && <div style={{ fontSize: 11, color: "#334155", fontWeight: 400 }}>~{cellsToKm2(aggregate.limitedCount)}</div>}
                         </td>
-                        <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600, color: aggregate.prohibitedCount > 0 ? "#f87171" : "#334155", fontVariantNumeric: "tabular-nums" }}>
-                          {aggregate.prohibitedCount.toLocaleString()}
+                        <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600, color: aggregate.prohibitedCount > 0 ? "#f87171" : "#334155", fontVariantNumeric: "tabular-nums", lineHeight: 1.3 }}>
+                          {aggregate.prohibitedCount > 0 ? aggregate.prohibitedCount.toLocaleString() : <span style={{ color: "#1e293b" }}>—</span>}
+                          {aggregate.prohibitedCount > 0 && <div style={{ fontSize: 11, color: "#334155", fontWeight: 400 }}>~{cellsToKm2(aggregate.prohibitedCount)}</div>}
                         </td>
                         <td style={{ ...tdStyle, textAlign: "right", fontWeight: 800, fontSize: 16, color: "#f8fafc", fontVariantNumeric: "tabular-nums" }}>
                           ${totalCredits.toLocaleString()}
@@ -751,7 +811,7 @@ function StatCard({ label, count, color }) {
         {count !== null ? count.toLocaleString() : "—"}
       </div>
       <div style={{ color: "#334155", fontSize: 11 }}>
-        res 9 cells
+        {count !== null && count > 0 ? `~${cellsToKm2(count)} km²` : "km²"}
       </div>
     </div>
   );
