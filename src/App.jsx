@@ -18,6 +18,56 @@ function priceForFlyableCount(count) {
   return n * 35;
 }
 
+// ── Contiguity grouping ───────────────────────────────────────────────────────
+// Returns an array of groups; each group is an array of polygon indices from hexes[].
+// Two polygons are contiguous if any cell in one is within 1 H3 res-9 ring of any cell in the other.
+function groupContiguousPolygons(hexes) {
+  const n = hexes.length;
+  if (n <= 1) return hexes.map((_, i) => [i]);
+
+  // Use all cells per polygon (flyable + limited + prohibited) for geographic adjacency
+  const allCells = hexes.map((p) => [
+    ...p.flyable,
+    ...p.limited.map((z) => z.id),
+    ...p.prohibited.map((z) => z.id),
+  ]);
+
+  // Expand each polygon's cell set by 1 ring
+  const expandedSets = allCells.map((cells) => {
+    const expanded = new Set();
+    for (const cell of cells) {
+      for (const neighbor of gridDisk(cell, 1)) expanded.add(neighbor);
+    }
+    return expanded;
+  });
+
+  // Union-Find
+  const parent = Array.from({ length: n }, (_, i) => i);
+  function find(i) {
+    while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; }
+    return i;
+  }
+  function union(i, j) { parent[find(i)] = find(j); }
+
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      if (find(i) === find(j)) continue;
+      for (const cell of allCells[j]) {
+        if (expandedSets[i].has(cell)) { union(i, j); break; }
+      }
+    }
+  }
+
+  // Collect groups, preserving polygon order
+  const groups = new Map();
+  for (let i = 0; i < n; i++) {
+    const root = find(i);
+    if (!groups.has(root)) groups.set(root, []);
+    groups.get(root).push(i);
+  }
+  return Array.from(groups.values());
+}
+
 // ── Status ───────────────────────────────────────────────────────────────────
 
 function getStatus(aggregate) {
@@ -153,18 +203,23 @@ export default function App() {
   const status = aggregate ? getStatus(aggregate) : null;
   const statusCfg = status ? STATUS_CONFIG[status] : null;
 
-  // Credit rows — one per polygon
+  // Credit rows — grouped by contiguity (polygons within 1 H3 res-9 cell are pooled)
   const creditRows = hexes
-    ? hexes.map((p) => ({
-        name:            p.name,
-        flyable:         p.flyable.length,
-        limited:         p.limited.length,
-        prohibited:      p.prohibited.length,
-        limitedZones:    p.limited,    // [{id, desc}]
-        prohibitedZones: p.prohibited, // [{id, desc}]
-        hasRestrictions: p.limited.length > 0 || p.prohibited.length > 0,
-        price:           priceForFlyableCount(p.flyable.length),
-      }))
+    ? groupContiguousPolygons(hexes).map((indices) => {
+        const polys = indices.map((i) => hexes[i]);
+        const flyable    = polys.reduce((s, p) => s + p.flyable.length, 0);
+        const limited    = polys.reduce((s, p) => s + p.limited.length, 0);
+        const prohibited = polys.reduce((s, p) => s + p.prohibited.length, 0);
+        const price      = priceForFlyableCount(flyable);
+        const hasRestrictions = polys.some((p) => p.limited.length > 0 || p.prohibited.length > 0);
+        const name = polys.length === 1
+          ? polys[0].name
+          : polys.map((p) => p.name).join(" + ");
+        // Flatten all zones across polygons in this group for zone detail expansion
+        const limitedZones    = polys.flatMap((p) => p.limited);
+        const prohibitedZones = polys.flatMap((p) => p.prohibited);
+        return { name, flyable, limited, prohibited, price, hasRestrictions, isGroup: polys.length > 1, limitedZones, prohibitedZones };
+      })
     : [];
   const totalCredits = creditRows.reduce((sum, r) => sum + r.price, 0);
   const anyRestrictions = creditRows.some((r) => r.hasRestrictions);
@@ -436,7 +491,7 @@ export default function App() {
                     Credit Estimate
                   </div>
                   <div style={{ color: "#64748b", fontSize: 13 }}>
-                    Per polygon · flyable Spexigons only · 1 credit = $1
+                    Grouped by contiguity · flyable Spexigons only · 1 credit = $1
                   </div>
                 </div>
 
@@ -490,7 +545,24 @@ export default function App() {
                                 ) : (
                                   <span style={{ width: 18, flexShrink: 0 }} />
                                 )}
-                                {row.name}
+                                <span>
+                                  {row.name}
+                                  {row.isGroup && (
+                                    <span style={{
+                                      marginLeft: 8,
+                                      fontSize: 10,
+                                      fontWeight: 700,
+                                      color: "#a78bfa",
+                                      background: "rgba(167,139,250,0.12)",
+                                      border: "1px solid rgba(167,139,250,0.25)",
+                                      borderRadius: 4,
+                                      padding: "1px 5px",
+                                      letterSpacing: "0.05em",
+                                      textTransform: "uppercase",
+                                      verticalAlign: "middle",
+                                    }}>Group</span>
+                                  )}
+                                </span>
                                 {row.hasRestrictions && (
                                   <span style={{ color: "#f59e0b", fontSize: 12 }}>*</span>
                                 )}
