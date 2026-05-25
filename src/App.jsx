@@ -99,6 +99,7 @@ export default function App() {
   const [lookupLoading, setLookupLoading] = useState(false);
   const [expandedRows, setExpandedRows] = useState(new Set());
   const [isDragging, setIsDragging] = useState(false);
+  const [aoiFile, setAoiFile] = useState(null); // original File object for JIRA attachment
 
   // ── JIRA form state ───────────────────────────────────────────────────────
   const [jiraOpen, setJiraOpen] = useState(false);
@@ -109,6 +110,7 @@ export default function App() {
     notes: "",
   });
   const [jiraSubmitting, setJiraSubmitting] = useState(false);
+  const [jiraSubmitStep, setJiraSubmitStep] = useState(""); // "creating" | "attaching" | ""
   const [jiraResult, setJiraResult] = useState(null); // { url, key } from API
   const [jiraError, setJiraError] = useState("");
 
@@ -149,6 +151,7 @@ export default function App() {
     if (!file) return;
     setError("");
     setFileName(file.name);
+    setAoiFile(file);
     setHexes(null);
     setExpandedRows(new Set());
     try {
@@ -267,8 +270,10 @@ export default function App() {
   async function submitJiraTicket(e) {
     e.preventDefault();
     setJiraSubmitting(true);
+    setJiraSubmitStep("creating");
     setJiraError("");
     try {
+      // ── Step 1: create the ticket ─────────────────────────────────────────
       const summary = `[${ticketTypeLabel}] ${jiraForm.projectName} – ${jiraForm.clientName}`;
 
       const restrictionLines = [];
@@ -304,11 +309,55 @@ export default function App() {
         throw new Error(errMsg);
       }
       const data = await res.json();
-      setJiraResult(data);
+
+      // ── Step 2: attach files ──────────────────────────────────────────────
+      setJiraSubmitStep("attaching");
+      const attachErrors = [];
+
+      // Helper: POST a file to /api/attach-file
+      async function attachToJira(filename, mimeType, base64data) {
+        const r = await fetch("/api/attach-file", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ issueKey: data.key, filename, mimeType, data: base64data }),
+        });
+        if (!r.ok) {
+          const e = await r.json().catch(() => ({}));
+          const msg = typeof e.error === "string" ? e.error : e.error?.message || `Attach failed (${r.status})`;
+          attachErrors.push(`${filename}: ${msg}`);
+        }
+      }
+
+      // Attach original AOI file
+      if (aoiFile) {
+        const aoiBase64 = await fileToBase64(aoiFile);
+        const aoiMime = aoiFile.type || guessMime(aoiFile.name);
+        await attachToJira(aoiFile.name, aoiMime, aoiBase64);
+      }
+
+      // Attach generated KML
+      if (hexes) {
+        const allCells = hexes.flatMap((p) => [
+          ...p.flyable.map((c)    => ({ cell: c,    type: "flyable" })),
+          ...p.limited.map((z)    => ({ cell: z.id, type: "limited" })),
+          ...p.prohibited.map((z) => ({ cell: z.id, type: "prohibited" })),
+        ]);
+        const kmlString = buildKML(allCells);
+        const kmlBase64 = btoa(unescape(encodeURIComponent(kmlString)));
+        const base = (fileName || "aoi").replace(/\.[^/.]+$/, "");
+        const kmlFilename = `${base}_H3_Res${H3_RESOLUTION}_${totalCells}.kml`;
+        await attachToJira(kmlFilename, "application/vnd.google-earth.kml+xml", kmlBase64);
+      }
+
+      setJiraResult({
+        ...data,
+        attachWarning: attachErrors.length ? attachErrors.join("; ") : null,
+      });
     } catch (err) {
       setJiraError(err.message || "Failed to create ticket.");
     } finally {
       setJiraSubmitting(false);
+      setJiraSubmitStep("");
     }
   }
 
@@ -929,6 +978,21 @@ export default function App() {
                     Open in JIRA →
                   </a>
                 )}
+                {jiraResult.attachWarning && (
+                  <div style={{
+                    marginTop: 12,
+                    marginBottom: 4,
+                    padding: "10px 14px",
+                    borderRadius: 10,
+                    background: "rgba(245, 158, 11, 0.1)",
+                    border: "1px solid rgba(245, 158, 11, 0.25)",
+                    color: "#f59e0b",
+                    fontSize: 12,
+                    lineHeight: 1.5,
+                  }}>
+                    ⚠ Ticket created but file attach failed: {jiraResult.attachWarning}
+                  </div>
+                )}
                 <div>
                   <button
                     onClick={closeJiraForm}
@@ -1069,7 +1133,9 @@ export default function App() {
                       transition: "background 150ms",
                     }}
                   >
-                    {jiraSubmitting ? "Creating…" : "Create Ticket"}
+                    {jiraSubmitting
+                      ? jiraSubmitStep === "attaching" ? "Attaching files…" : "Creating ticket…"
+                      : "Create Ticket"}
                   </button>
                 </div>
               </form>
@@ -1256,6 +1322,26 @@ function h3ToPolygonFeature(cell) {
   coords.push(coords[0]);
   return turf.polygon([coords]);
 }
+// ── File helpers ─────────────────────────────────────────────────────────────
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(",")[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+function guessMime(filename) {
+  const ext = filename.split(".").pop().toLowerCase();
+  const map = {
+    kml: "application/vnd.google-earth.kml+xml",
+    kmz: "application/vnd.google-earth.kmz",
+    geojson: "application/geo+json",
+    json: "application/json",
+  };
+  return map[ext] || "application/octet-stream";
+}
+
 // ── KML export ───────────────────────────────────────────────────────────────
 const KML_COLORS = {
   flyable:    { line: "ff00cc44", poly: "4400cc44" },
