@@ -298,7 +298,10 @@ export default function App() {
       });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || `Server error: ${res.status}`);
+        const errMsg = typeof errData.error === "string"
+          ? errData.error
+          : errData.error?.message || JSON.stringify(errData.error) || `Server error: ${res.status}`;
+        throw new Error(errMsg);
       }
       const data = await res.json();
       setJiraResult(data);
