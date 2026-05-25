@@ -230,8 +230,9 @@ export default function App() {
   const anyRestrictions    = creditRows.some(r => r.hasRestrictions);
   const anyFlyableOnly     = creditRows.some(r => !r.hasRestrictions);
 
-  // Auto-detected ticket type based on flyability status
-  const ticketType = status === "flyable" ? "New Mission Request" : "Feasibility Request";
+  // Auto-detected ticket type — matches API label logic (ticketType === 'feasibility' → feasibility-request)
+  const ticketType = status === "flyable" ? "new-mission" : "feasibility";
+  const ticketTypeLabel = status === "flyable" ? "New Mission Request" : "Feasibility Request";
 
   function downloadKML() {
     if (!hexes) return;
@@ -268,23 +269,32 @@ export default function App() {
     setJiraSubmitting(true);
     setJiraError("");
     try {
+      const summary = `[${ticketTypeLabel}] ${jiraForm.projectName} – ${jiraForm.clientName}`;
+
+      const restrictionLines = [];
+      if ((aggregate?.limitedCount ?? 0) > 0)
+        restrictionLines.push(`Limited cells: ${aggregate.limitedCount.toLocaleString()} (~${cellsToKm2(aggregate.limitedCount)} km²)`);
+      if ((aggregate?.prohibitedCount ?? 0) > 0)
+        restrictionLines.push(`Prohibited cells: ${aggregate.prohibitedCount.toLocaleString()} (~${cellsToKm2(aggregate.prohibitedCount)} km²)`);
+
+      const description = [
+        `Mission Type: ${jiraForm.missionType}`,
+        `Client: ${jiraForm.clientName}`,
+        `Project: ${jiraForm.projectName}`,
+        ``,
+        `AOI Summary`,
+        `Flyable cells: ${(aggregate?.flyableCount ?? 0).toLocaleString()} (~${cellsToKm2(aggregate?.flyableCount ?? 0)} km²)`,
+        ...restrictionLines,
+        `Total cells: ${totalCells.toLocaleString()} (~${cellsToKm2(totalCells)} km²)`,
+        `Credit estimate: $${totalCredits.toLocaleString()}`,
+        `Source file: ${fileName}`,
+        ...(jiraForm.notes ? [``, `Notes`, jiraForm.notes] : []),
+      ].join("\n");
+
       const res = await fetch("/api/create-ticket", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          projectName: jiraForm.projectName,
-          clientName: jiraForm.clientName,
-          missionType: jiraForm.missionType,
-          notes: jiraForm.notes,
-          ticketType,
-          flyableCount: aggregate?.flyableCount ?? 0,
-          limitedCount: aggregate?.limitedCount ?? 0,
-          prohibitedCount: aggregate?.prohibitedCount ?? 0,
-          totalCredits,
-          totalCells,
-          areaKm2: cellsToKm2(totalCells),
-          fileName,
-        }),
+        body: JSON.stringify({ summary, description, ticketType, missionType: jiraForm.missionType }),
       });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
@@ -860,14 +870,14 @@ export default function App() {
               marginBottom: 24,
               padding: "12px 16px",
               borderRadius: 12,
-              background: ticketType === "New Mission Request"
+              background: ticketType === "new-mission"
                 ? "rgba(34, 197, 94, 0.08)"
                 : "rgba(245, 158, 11, 0.08)",
-              border: `1px solid ${ticketType === "New Mission Request"
+              border: `1px solid ${ticketType === "new-mission"
                 ? "rgba(34, 197, 94, 0.25)"
                 : "rgba(245, 158, 11, 0.25)"}`,
             }}>
-              <span style={{ fontSize: 16 }}>{ticketType === "New Mission Request" ? "✅" : "⚠️"}</span>
+              <span style={{ fontSize: 16 }}>{ticketType === "new-mission" ? "✅" : "⚠️"}</span>
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#64748b", marginBottom: 2 }}>
                   Auto-detected ticket type
@@ -875,9 +885,9 @@ export default function App() {
                 <div style={{
                   fontSize: 15,
                   fontWeight: 700,
-                  color: ticketType === "New Mission Request" ? "#22c55e" : "#f59e0b",
+                  color: ticketType === "new-mission" ? "#22c55e" : "#f59e0b",
                 }}>
-                  {ticketType}
+                  {ticketTypeLabel}
                 </div>
               </div>
             </div>
