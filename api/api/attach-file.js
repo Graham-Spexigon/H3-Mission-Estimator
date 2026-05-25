@@ -13,11 +13,21 @@ export default async function handler(req, res) {
   const token = process.env.JIRA_API_TOKEN;
   const credentials = Buffer.from(`${email}:${token}`).toString('base64');
 
-  // Reconstruct file from base64 and build multipart form
-  const buffer = Buffer.from(data, 'base64');
-  const blob = new Blob([buffer], { type: mimeType || 'application/octet-stream' });
-  const form = new FormData();
-  form.append('file', blob, filename);
+  const fileBuffer = Buffer.from(data, 'base64');
+  const boundary = `----FormBoundary${Date.now().toString(16)}`;
+  const nl = '\r\n';
+  const contentType = mimeType || 'application/octet-stream';
+
+  // Build multipart body using plain Buffers — no Blob/FormData needed
+  const header = Buffer.from(
+    `--${boundary}${nl}` +
+    `Content-Disposition: form-data; name="file"; filename="${filename}"${nl}` +
+    `Content-Type: ${contentType}${nl}` +
+    `${nl}`,
+    'utf8'
+  );
+  const footer = Buffer.from(`${nl}--${boundary}--${nl}`, 'utf8');
+  const body = Buffer.concat([header, fileBuffer, footer]);
 
   try {
     const response = await fetch(
@@ -27,10 +37,10 @@ export default async function handler(req, res) {
         headers: {
           Authorization: `Basic ${credentials}`,
           'X-Atlassian-Token': 'no-check',
-          Accept: 'application/json',
-          // Do NOT set Content-Type — fetch sets it automatically with the multipart boundary
+          'Content-Type': `multipart/form-data; boundary=${boundary}`,
+          'Accept': 'application/json',
         },
-        body: form,
+        body,
       }
     );
 
