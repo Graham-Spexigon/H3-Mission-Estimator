@@ -15,7 +15,7 @@ export default async function handler(req, res) {
     fields: {
       project: { key: 'OP' },
       summary: summary,
-      issuetype: { name: 'Task' },
+      issuetype: { name: 'Story' },
       labels: [label],
       description: {
         type: 'doc',
