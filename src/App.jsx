@@ -381,7 +381,7 @@ export default function App() {
         .upload-btn:hover { background: #e2e8f0 !important; }
         .upload-btn:active { background: #cbd5e1 !important; }
         .kml-btn:hover:not(:disabled) { background: #e2e8f0 !important; }
-        .jira-btn:hover:not(:disabled) { background: rgba(167, 139, 250, 0.25) !important; }
+        .jira-btn:hover:not(:disabled) { background: #16a34a !important; }
         .jira-submit-btn:hover:not(:disabled) { background: #7c3aed !important; }
         .jira-input {
           width: 100%;
@@ -621,13 +621,9 @@ export default function App() {
                   style={{
                     padding: "12px 16px",
                     borderRadius: 12,
-                    border: hexes
-                      ? "1px solid rgba(167, 139, 250, 0.35)"
-                      : "1px solid rgba(148, 163, 184, 0.1)",
-                    background: hexes
-                      ? "rgba(167, 139, 250, 0.12)"
-                      : "rgba(148, 163, 184, 0.05)",
-                    color: hexes ? "#a78bfa" : "#334155",
+                    border: "none",
+                    background: hexes ? "#22c55e" : "rgba(148, 163, 184, 0.05)",
+                    color: hexes ? "#ffffff" : "#334155",
                     fontWeight: 700,
                     fontSize: 14,
                     cursor: hexes ? "pointer" : "not-allowed",
