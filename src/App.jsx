@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import JSZip from "jszip";
-import { latLngToCell, cellToBoundary, polygonToCells } from "h3-js";
+import { latLngToCell, cellToBoundary, polygonToCells, gridDisk } from "h3-js";
 import toGeoJSON from "@mapbox/togeojson";
 
 const H3_RESOLUTION = 9;
@@ -49,6 +49,73 @@ const STATUS_CONFIG = {
     border: "rgba(239, 68, 68, 0.35)",
   },
 };
+
+// ── Contiguity grouping ───────────────────────────────────────────────────────
+// Two polygons are contiguous if any cell in one is a neighbour of any cell in
+// the other (checked via gridDisk expansion). Adjacent polygons are pooled into
+// a single pricing group.
+
+function groupContiguousPolygons(hexes) {
+  const n = hexes.length;
+  if (n === 0) return [];
+  if (n === 1) return [[0]];
+
+  // Expand each polygon's cells by 1 ring so touching edges register as overlap
+  const expandedSets = hexes.map(({ flyable, limited, prohibited }) => {
+    const expanded = new Set();
+    const allCells = [
+      ...flyable,
+      ...limited.map((z) => z.id),
+      ...prohibited.map((z) => z.id),
+    ];
+    for (const cell of allCells) {
+      for (const neighbor of gridDisk(cell, 1)) expanded.add(neighbor);
+    }
+    return expanded;
+  });
+
+  // Build adjacency list
+  const adj = Array.from({ length: n }, () => []);
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const [a, b] =
+        expandedSets[i].size <= expandedSets[j].size
+          ? [expandedSets[i], expandedSets[j]]
+          : [expandedSets[j], expandedSets[i]];
+      let adjacent = false;
+      for (const cell of a) {
+        if (b.has(cell)) { adjacent = true; break; }
+      }
+      if (adjacent) {
+        adj[i].push(j);
+        adj[j].push(i);
+      }
+    }
+  }
+
+  // Connected components via BFS
+  const visited = new Array(n).fill(false);
+  const groups = [];
+  for (let start = 0; start < n; start++) {
+    if (visited[start]) continue;
+    const group = [];
+    const queue = [start];
+    visited[start] = true;
+    while (queue.length) {
+      const curr = queue.shift();
+      group.push(curr);
+      for (const next of adj[curr]) {
+        if (!visited[next]) {
+          visited[next] = true;
+          queue.push(next);
+        }
+      }
+    }
+    groups.push(group);
+  }
+
+  return groups;
+}
 
 export default function App() {
   const [polygonFeatures, setPolygonFeatures] = useState([]);
@@ -152,19 +219,32 @@ export default function App() {
   const status = aggregate ? getStatus(aggregate) : null;
   const statusCfg = status ? STATUS_CONFIG[status] : null;
 
-  // Credit rows — one per polygon
-  const creditRows = hexes
-    ? hexes.map((p) => ({
-        name:            p.name,
-        flyable:         p.flyable.length,
-        limited:         p.limited.length,
-        prohibited:      p.prohibited.length,
-        limitedZones:    p.limited,    // [{id, desc}]
-        prohibitedZones: p.prohibited, // [{id, desc}]
-        hasRestrictions: p.limited.length > 0 || p.prohibited.length > 0,
-        price:           priceForFlyableCount(p.flyable.length),
-      }))
-    : [];
+  // Credit rows — one per contiguous group
+  const groups = hexes ? groupContiguousPolygons(hexes) : [];
+  const creditRows = groups.map((indices) => {
+    const polygons      = indices.map((i) => hexes[i]);
+    const flyable       = polygons.reduce((s, p) => s + p.flyable.length, 0);
+    const limited       = polygons.reduce((s, p) => s + p.limited.length, 0);
+    const prohibited    = polygons.reduce((s, p) => s + p.prohibited.length, 0);
+    const limitedZones    = polygons.flatMap((p) => p.limited);
+    const prohibitedZones = polygons.flatMap((p) => p.prohibited);
+    const price = priceForFlyableCount(flyable);
+    const first = polygons[0].name;
+    const name  = polygons.length === 1
+      ? first
+      : `${first} +${polygons.length - 1} more`;
+    return {
+      name,
+      flyable,
+      limited,
+      prohibited,
+      limitedZones,
+      prohibitedZones,
+      hasRestrictions: limited > 0 || prohibited > 0,
+      price,
+      isGroup: polygons.length > 1,
+    };
+  });
   const totalCredits = creditRows.reduce((sum, r) => sum + r.price, 0);
   const anyRestrictions = creditRows.some((r) => r.hasRestrictions);
 
