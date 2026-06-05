@@ -766,14 +766,12 @@ function computeHexesForPolygon(polygon) {
 
 // GeoJSON coords are [lng, lat] — h3 polygonToCells expects [lat, lng]
 function fillPolygonRings(rings) {
-  const [outer, ...holes] = rings;
+  const [outer] = rings;
+  if (!outer) return [];
   return polygonToCells(
-    {
-      outer: outer.map(([lng, lat]) => [lat, lng]),
-      holes: holes.map((ring) => ring.map(([lng, lat]) => [lat, lng])),
-    },
+    outer.map(([lng, lat]) => [lat, lng]),
     H3_RESOLUTION
-  );
+  ) ?? [];
 }
 
 // ── KML export ───────────────────────────────────────────────────────────────
