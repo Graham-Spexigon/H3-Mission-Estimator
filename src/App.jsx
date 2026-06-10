@@ -852,11 +852,22 @@ function fillPolygonRings(rings) {
   const [outer] = rings;
   if (!outer) return [];
   const coords = outer.map(([lng, lat]) => [lat, lng]);
+
+  // Preferred: h3-js 4.2+ overlapping containment — every hex touching the
+  // polygon is included, not just hexes whose center falls inside.
+  // Flag name differs slightly across versions, and an unknown flag throws
+  // (code 15), so try both spellings inside try/catch before falling back.
   if (typeof polygonToCellsExperimental === "function") {
-    return polygonToCellsExperimental(coords, H3_RESOLUTION, "containment_overlapping") ?? [];
+    for (const flag of ["containment_overlapping", "overlapping"]) {
+      try {
+        const cells = polygonToCellsExperimental(coords, H3_RESOLUTION, flag);
+        if (cells && cells.length) return cells;
+      } catch (_) { /* unknown flag for this version — try next / fall back */ }
+    }
   }
-  // Fallback for h3-js < 4.2: expand center-contained cells by one ring,
-  // which catches boundary hexes at the cost of slight over-inclusion.
+
+  // Fallback (h3-js < 4.2 or no overlapping support): expand center-contained
+  // cells by one ring to catch boundary hexes. Slight over-inclusion, but no gaps.
   const seed = polygonToCells(coords, H3_RESOLUTION) ?? [];
   const cells = new Set(seed);
   for (const cell of seed) for (const n of gridDisk(cell, 1)) cells.add(n);
