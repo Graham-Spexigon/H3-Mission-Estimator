@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import JSZip from "jszip";
-import { latLngToCell, cellToBoundary, polygonToCells, gridDisk } from "h3-js";
+import { latLngToCell, cellToBoundary, polygonToCells, polygonToCellsExperimental, gridDisk } from "h3-js";
 import toGeoJSON from "@mapbox/togeojson";
 
 const H3_RESOLUTION = 9;
@@ -844,14 +844,23 @@ function computeHexesForPolygon(polygon) {
   return [];
 }
 
-// GeoJSON coords are [lng, lat] — h3 polygonToCells expects [lat, lng]
+// GeoJSON coords are [lng, lat] — h3 expects [lat, lng]
+// Uses "overlapping" containment so every hex touching the polygon is included,
+// not just hexes whose center falls inside (polygonToCells center-only behavior
+// drops boundary hexes on narrow polygons).
 function fillPolygonRings(rings) {
   const [outer] = rings;
   if (!outer) return [];
-  return polygonToCells(
-    outer.map(([lng, lat]) => [lat, lng]),
-    H3_RESOLUTION
-  ) ?? [];
+  const coords = outer.map(([lng, lat]) => [lat, lng]);
+  if (typeof polygonToCellsExperimental === "function") {
+    return polygonToCellsExperimental(coords, H3_RESOLUTION, "overlapping") ?? [];
+  }
+  // Fallback for h3-js < 4.2: expand center-contained cells by one ring,
+  // which catches boundary hexes at the cost of slight over-inclusion.
+  const seed = polygonToCells(coords, H3_RESOLUTION) ?? [];
+  const cells = new Set(seed);
+  for (const cell of seed) for (const n of gridDisk(cell, 1)) cells.add(n);
+  return Array.from(cells);
 }
 
 // ── KML export ───────────────────────────────────────────────────────────────
