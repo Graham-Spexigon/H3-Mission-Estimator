@@ -1,6 +1,7 @@
-import { useState, useRef } from "react";
+import { useState, useRef, Fragment } from "react";
 import JSZip from "jszip";
-import { latLngToCell, cellToBoundary, polygonToCells, polygonToCellsExperimental, gridDisk } from "h3-js";
+import { cellToBoundary, polygonToCells, polygonToCellsExperimental, gridDisk } from "h3-js";
+import * as turf from "@turf/turf";
 import toGeoJSON from "@mapbox/togeojson";
 
 const H3_RESOLUTION = 9;
@@ -118,7 +119,6 @@ function groupContiguousPolygons(hexes) {
 }
 
 export default function App() {
-  const [polygonFeatures, setPolygonFeatures] = useState([]);
   // hexes: [{name, flyable[], limited:[{id,desc}], prohibited:[{id,desc}]}]
   const [hexes, setHexes] = useState(null);
   const [fileName, setFileName] = useState("");
@@ -173,7 +173,6 @@ export default function App() {
         parseFile(file),
         loadLookup(),
       ]);
-      setPolygonFeatures(polygons);
 
       // Compute H3 cells per polygon, then classify each
       const perPolygon = computeHexes(polygons);
@@ -194,7 +193,6 @@ export default function App() {
       setHexes(categorized);
     } catch (err) {
       console.error(err);
-      setPolygonFeatures([]);
       setHexes(null);
       setError(err.message || "Could not process file.");
     }
@@ -242,7 +240,6 @@ export default function App() {
       prohibitedZones,
       hasRestrictions: limited > 0 || prohibited > 0,
       price,
-      isGroup: polygons.length > 1,
     };
   });
   const totalCredits = creditRows.reduce((sum, r) => sum + r.price, 0);
@@ -543,9 +540,8 @@ export default function App() {
                         const isExpanded = expandedRows.has(i);
                         const canExpand = row.hasRestrictions;
                         return (
-                          <>
+                          <Fragment key={i}>
                             <tr
-                              key={`row-${i}`}
                               onClick={canExpand ? () => toggleRow(i) : undefined}
                               style={{
                                 borderTop: i > 0 ? "1px solid rgba(148, 163, 184, 0.07)" : "none",
@@ -593,7 +589,7 @@ export default function App() {
 
                             {/* Expanded zone detail rows */}
                             {isExpanded && (
-                              <tr key={`expand-${i}`} style={{ background: "rgba(0,0,0,0.18)" }}>
+                              <tr style={{ background: "rgba(0,0,0,0.18)" }}>
                                 <td colSpan={6} style={{ padding: "0 0 8px 46px" }}>
                                   {[
                                     ...row.prohibitedZones.map((z) => ({ ...z, type: "prohibited" })),
@@ -628,7 +624,7 @@ export default function App() {
                                 </td>
                               </tr>
                             )}
-                          </>
+                          </Fragment>
                         );
                       })}
                     </tbody>
@@ -844,34 +840,39 @@ function computeHexesForPolygon(polygon) {
   return [];
 }
 
-// GeoJSON coords are [lng, lat] — h3 expects [lat, lng]
-// Uses "overlapping" containment so every hex touching the polygon is included,
-// not just hexes whose center falls inside (polygonToCells center-only behavior
-// drops boundary hexes on narrow polygons).
+// Returns every H3 cell that intersects the polygon — including boundary hexes
+// whose center falls outside (plain polygonToCells is center-only and drops
+// them, which leaves gaps on narrow shapes). GeoJSON rings are [lng, lat];
+// h3's experimental fill expects [lat, lng].
 function fillPolygonRings(rings) {
   const [outer] = rings;
   if (!outer) return [];
-  const coords = outer.map(([lng, lat]) => [lat, lng]);
+  const latLng = outer.map(([lng, lat]) => [lat, lng]);
 
-  // Preferred: h3-js 4.2+ overlapping containment — every hex touching the
-  // polygon is included, not just hexes whose center falls inside.
-  // Flag name differs slightly across versions, and an unknown flag throws
-  // (code 15), so try both spellings inside try/catch before falling back.
+  // Preferred: h3-js 4.2+ native overlapping containment — exact, every hex
+  // touching the polygon, no false positives. Unknown flag throws code 15 on
+  // older versions, so guard with try/catch and fall back.
   if (typeof polygonToCellsExperimental === "function") {
-    for (const flag of ["containment_overlapping", "overlapping"]) {
-      try {
-        const cells = polygonToCellsExperimental(coords, H3_RESOLUTION, flag);
-        if (cells && cells.length) return cells;
-      } catch (_) { /* unknown flag for this version — try next / fall back */ }
-    }
+    try {
+      const cells = polygonToCellsExperimental(latLng, H3_RESOLUTION, "containment_overlapping");
+      if (cells && cells.length) return cells;
+    } catch (_) { /* flag unsupported on this h3-js version — fall through */ }
   }
 
-  // Fallback (h3-js < 4.2 or no overlapping support): expand center-contained
-  // cells by one ring to catch boundary hexes. Slight over-inclusion, but no gaps.
-  const seed = polygonToCells(coords, H3_RESOLUTION) ?? [];
-  const cells = new Set(seed);
-  for (const cell of seed) for (const n of gridDisk(cell, 1)) cells.add(n);
-  return Array.from(cells);
+  // Fallback (h3-js < 4.2): center-contained cells miss boundary hexes, so
+  // widen by one ring to get candidates, then keep only those that actually
+  // intersect the polygon. The intersection test removes the perimeter ring of
+  // non-touching hexes that a naive gridDisk expansion would wrongly include.
+  const seed = polygonToCells(latLng, H3_RESOLUTION) ?? [];
+  const candidates = new Set(seed);
+  for (const cell of seed) for (const n of gridDisk(cell, 1)) candidates.add(n);
+
+  const aoi = turf.polygon(rings); // [lng, lat], rings already closed by GeoJSON
+  return Array.from(candidates).filter((cell) => {
+    const ring = cellToBoundary(cell, true); // [lng, lat]
+    ring.push(ring[0]);
+    return turf.booleanIntersects(turf.polygon([ring]), aoi);
+  });
 }
 
 // ── KML export ───────────────────────────────────────────────────────────────
