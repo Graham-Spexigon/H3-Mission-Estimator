@@ -853,7 +853,7 @@ function fillPolygonRings(rings) {
   if (!outer) return [];
   const coords = outer.map(([lng, lat]) => [lat, lng]);
   if (typeof polygonToCellsExperimental === "function") {
-    return polygonToCellsExperimental(coords, H3_RESOLUTION, "overlapping") ?? [];
+    return polygonToCellsExperimental(coords, H3_RESOLUTION, "containment_overlapping") ?? [];
   }
   // Fallback for h3-js < 4.2: expand center-contained cells by one ring,
   // which catches boundary hexes at the cost of slight over-inclusion.
